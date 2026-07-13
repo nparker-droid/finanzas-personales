@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F6F8FC">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Mis finanzas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.12.7/umd/Recharts.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>*,*::before,*::after{box-sizing:border-box;}body{margin:0;padding:0;}</style>
+</head>
+<body>
+<div id="root"><div id="splash" style="font-family:system-ui,sans-serif;padding:26px;color:#8A90A0;font-size:14px;">Cargando dashboard…</div></div>
+<script>
+(function(){
+  function show(msg){var s=document.getElementById("splash"); if(s) s.textContent="⚠ "+msg;}
+  window.addEventListener("error",function(ev){
+    if(ev.target&&ev.target.src){ show("No cargó: "+ev.target.src.split("/").pop()); return; }
+    show("Error: "+(ev.message||"desconocido")+(ev.lineno?" (línea "+ev.lineno+")":""));
+  },true);
+  window.addEventListener("unhandledrejection",function(ev){
+    show("Error (promesa): "+((ev.reason&&ev.reason.message)||ev.reason));
+  });
+  setTimeout(function(){
+    var faltan=["React","ReactDOM","Recharts","Babel"].filter(function(n){return !window[n];});
+    show(faltan.length?"No cargaron librerías: "+faltan.join(", ")+" — revisa la conexión":"La app no montó en 8 s — abre la consola (F12) y mándale el error a Claude");
+  },8000);
+})();
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef } = React;
+// Gráficos: si Recharts no carga, la app monta igual y los gráficos muestran aviso
+const RC = window.Recharts || {};
+const ChartNA = () => <div style={{padding:24,color:"#8A90A0",fontSize:12}}>⚠ gráfico no disponible (librería no cargó)</div>;
+const PieChart=RC.PieChart||ChartNA, Pie=RC.Pie||ChartNA, Cell=RC.Cell||ChartNA,
+      ResponsiveContainer=RC.ResponsiveContainer||ChartNA, BarChart=RC.BarChart||ChartNA, Bar=RC.Bar||ChartNA,
+      XAxis=RC.XAxis||ChartNA, YAxis=RC.YAxis||ChartNA, Tooltip=RC.Tooltip||ChartNA,
+      Legend=RC.Legend||ChartNA, CartesianGrid=RC.CartesianGrid||ChartNA;
+
+//<DATA> — bloque regenerable con: python build.py --inject dashboard_finanzas.html
+const DATA = [
+{"id": "notif-stgcc-20260712-01", "fecha": "2026-07-12", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Belen Espinoza", "monto": 18000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260712-01", "fecha": "2026-07-12", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Just Burger", "monto": 12078, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260711-01", "fecha": "2026-07-11", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Rossini", "monto": 6000, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260711-02", "fecha": "2026-07-11", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Municipalidad Las Condes", "monto": 38370, "flow": "out", "cat": "Servicios/Cuentas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260711-03", "fecha": "2026-07-11", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Rev Tec La Reina", "monto": 16800, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260711-04", "fecha": "2026-07-11", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "ESCH La Reina / Las Bru", "monto": 15000, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260710-01", "fecha": "2026-07-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Soap Bomberos", "monto": 8990, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chlint-20260710-01", "fecha": "2026-07-10", "cuenta": "CHL-TC-INT", "fuente": "notif", "comercio": "Anthropic Claude Sub", "monto": 23100, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "USD-bill", "monto_orig": 23.80, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260710-02", "fecha": "2026-07-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MP*Papa Johns", "monto": 19990, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260709-01", "fecha": "2026-07-09", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Notas del Sabor", "monto": 3000, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260709-02", "fecha": "2026-07-09", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "TUU*Ferreteria Princesa", "monto": 900, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260708-01", "fecha": "2026-07-08", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MP*BIPQR", "monto": 10000, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260708-02", "fecha": "2026-07-08", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Pasteleria San Pancracio", "monto": 3700, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260706-01", "fecha": "2026-07-06", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Comercial Lida 2184", "monto": 7400, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260706-02", "fecha": "2026-07-06", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*MercadoLibre", "monto": 13540, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260703-01", "fecha": "2026-07-03", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "DLOCAL*Google Play", "monto": 2690, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260702-01", "fecha": "2026-07-02", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Yokono", "monto": 6990, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20260702-02", "fecha": "2026-07-02", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Providencia 3", "monto": 8000, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-20260702-01", "fecha": "2026-07-02", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Ahylinne Carruz", "monto": 30000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-12", "fecha": "2026-07-01", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Karina Barra", "monto": 19470, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-13", "fecha": "2026-06-30", "cuenta": "STG-CC", "fuente": "notif", "comercio": "HIDROGESTION SPA (PAGO RENDICION N191 1717)", "monto": 44260, "flow": "in", "cat": "Sueldo/Ingreso", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-11", "fecha": "2026-07-01", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Felipe Vitar Carrillo", "monto": 12500, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-36", "fecha": "2026-06-30", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MAJEN", "monto": 26290, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-10", "fecha": "2026-06-30", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Michelle Parker Sabignone", "monto": 123769, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-35", "fecha": "2026-06-29", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MERCADOPAGO*CENTROECOLOGI", "monto": 2400, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-34", "fecha": "2026-06-29", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MERCADOPAGO*CENTROECOLOGI", "monto": 9820, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-33", "fecha": "2026-06-29", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "PRIME VIDEO PRIME VIDEO", "monto": 6490, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-32", "fecha": "2026-06-28", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "COPEC APP", "monto": 31000, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-09", "fecha": "2026-06-22", "cuenta": "STG-CC", "fuente": "notif", "comercio": "BGE SPA (BH 20 - serv. ing. hidráulica)", "monto": 416357, "flow": "in", "cat": "Sueldo/Ingreso", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-08", "fecha": "2026-06-24", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Thomas Andrew Parker Sabignone", "monto": 20000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-07", "fecha": "2026-06-25", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Carlos Carreño", "monto": 10000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-29", "fecha": "2026-06-25", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Pasteleria San Pancracio", "monto": 2900, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-30", "fecha": "2026-06-25", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Minimarket Walter Rivelin", "monto": 1600, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-31", "fecha": "2026-06-25", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Pasteleria San Pancracio", "monto": 3000, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-06", "fecha": "2026-06-24", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Ahylinne Carruz", "monto": 30000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-26", "fecha": "2026-06-24", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "AGU SPA", "monto": 3000, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-27", "fecha": "2026-06-22", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MERPAGO*BIPQR", "monto": 10000, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-28", "fecha": "2026-06-22", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "GUARDIA VIEJA", "monto": 36190, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-05", "fecha": "2026-06-22", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Felipe Vitar Carrillo (Robo)", "monto": 4950, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chlcc-04", "fecha": "2026-06-22", "cuenta": "CHL-CC", "fuente": "notif", "comercio": "Pago a Noris Figueroa (Regalo Alberto)", "monto": 10538, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-21", "fecha": "2026-06-21", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Tottus Vitacura", "monto": 14124, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-22", "fecha": "2026-06-21", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Tottus Vitacura", "monto": 81460, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-23", "fecha": "2026-06-21", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "SumUp*California Can", "monto": 26400, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-24", "fecha": "2026-06-20", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Rossini6923", "monto": 5200, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-25", "fecha": "2026-06-20", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Raffaella Cucina Napoletana", "monto": 62634, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-20", "fecha": "2026-06-19", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "McDonald's", "monto": 10080, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-19", "fecha": "2026-06-18", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Copec App", "monto": 20000, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-18", "fecha": "2026-06-18", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "AGU SPA", "monto": 3000, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-17", "fecha": "2026-06-18", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Comercial Lida 2184 Limit.", "monto": 5100, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-16", "fecha": "2026-06-18", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Spid General Holley O8", "monto": 6640, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-04", "fecha": "2026-06-17", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Ahylinne Carruz", "monto": 30000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-15", "fecha": "2026-06-17", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Rossini6923", "monto": 4200, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-03", "fecha": "2026-06-17", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf a Paola Sabignone (mamá)", "monto": 100000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-14", "fecha": "2026-06-17", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Yokono", "monto": 7980, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-13", "fecha": "2026-06-17", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*MercadoLibre", "monto": 68900, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-12", "fecha": "2026-06-16", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Kushki*SimplePark", "monto": 2225, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-11", "fecha": "2026-06-15", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Streat Burger San Fernando", "monto": 31770, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-10", "fecha": "2026-06-15", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Donaciones FALP OneClick", "monto": 7000, "flow": "out", "cat": "Donaciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-09", "fecha": "2026-06-15", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "La Negrita", "monto": 8590, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-08", "fecha": "2026-06-15", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MercadoPago*Vame", "monto": 3900, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-02", "fecha": "2026-06-14", "cuenta": "STG-CC", "fuente": "notif", "comercio": "Transf. de Paola Madeleine Sabignone", "monto": 20000, "flow": "in", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chlint-01", "fecha": "2026-06-10", "cuenta": "CHL-TC-INT", "fuente": "notif", "comercio": "ANTHROPIC* CLAUDE SUB", "monto": 21920, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "USD-bill", "monto_orig": 23.80, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-07", "fecha": "2026-06-11", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Salcobrand 496", "monto": 12759, "flow": "out", "cat": "Farmacia", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-06", "fecha": "2026-06-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "PAYU *UBER TRIP", "monto": 6494, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-05", "fecha": "2026-06-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "TECLADOS", "monto": 56100, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-04", "fecha": "2026-06-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Smart Fit Chile", "monto": 17450, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-03", "fecha": "2026-06-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Smart Fit Chile", "monto": 29900, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-02", "fecha": "2026-06-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "Manuel Julián Pérez Izuri", "monto": 5000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chltc-01", "fecha": "2026-06-10", "cuenta": "CHL-TC", "fuente": "notif", "comercio": "MP*BIPQR (recarga BIP)", "monto": 10000, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chlcc-03", "fecha": "2026-06-11", "cuenta": "CHL-CC", "fuente": "notif", "comercio": "Transf. de Millaray Curilem", "monto": 14800, "flow": "in", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chlcc-02", "fecha": "2026-06-11", "cuenta": "CHL-CC", "fuente": "notif", "comercio": "Transf. de Jose Miguel Hernandez", "monto": 16880, "flow": "in", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-chlcc-01", "fecha": "2026-06-11", "cuenta": "CHL-CC", "fuente": "notif", "comercio": "Transf. de Belen Constanza Espinoza", "monto": 14575, "flow": "in", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "notif-stgcc-01", "fecha": "2026-06-12", "cuenta": "STG-CC", "fuente": "notif", "comercio": "UNIRED (pago vía Fintoc)", "monto": 24648, "flow": "out", "cat": "Servicios/Cuentas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null},
+{"id": "stgcc-01", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Nicholas Parker (propia)", "monto": 1569778, "flow": "out", "cat": "Traspaso propio", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-02", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Traspaso a T. Crédito Santander", "monto": 150948, "flow": "out", "cat": "Pago tarjeta", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-03", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Pago CAE (a cuenta RUT)", "monto": 114127, "flow": "out", "cat": "CAE/Crédito", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-04", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Paola Sabignone (mamá)", "monto": 100000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-05", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Ahylinne Carruz", "monto": 30000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-06", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Thomas Andrew Parker", "monto": 20000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-07", "fecha": "2026-04-02", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a UNIRED (pago cuentas)", "monto": 16791, "flow": "out", "cat": "Servicios/Cuentas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-08", "fecha": "2026-04-06", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "PAC Seguro Auto", "monto": 30280, "flow": "out", "cat": "Seguros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-09", "fecha": "2026-04-07", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Francisco José Barr.", "monto": 9000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-10", "fecha": "2026-04-08", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Carlos Carreño", "monto": 10000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-11", "fecha": "2026-04-09", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Karina Barra", "monto": 7439, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-12", "fecha": "2026-04-15", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Francesca P. Navarro", "monto": 5000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-13", "fecha": "2026-04-15", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Karina Barra", "monto": 4500, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-14", "fecha": "2026-04-16", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Ahylinne Carruz", "monto": 30000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-15", "fecha": "2026-04-16", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Patricio Delfín Car.", "monto": 15000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-16", "fecha": "2026-04-16", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Aníbal Ignacio Lago", "monto": 7500, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-17", "fecha": "2026-04-17", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Mathías Carrasco", "monto": 8000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-18", "fecha": "2026-04-20", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf. Mauricio A. Lara", "monto": 40590, "flow": "in", "cat": "Reembolso recibido", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-19", "fecha": "2026-04-20", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Carlos Carreño", "monto": 10000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-20", "fecha": "2026-04-21", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Karina Barra", "monto": 22180, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-21", "fecha": "2026-04-27", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Ahylinne Carruz", "monto": 30000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-22", "fecha": "2026-04-30", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "HIDROGESTIÓN SPA (sueldo)", "monto": 1880562, "flow": "in", "cat": "Sueldo/Ingreso", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgcc-23", "fecha": "2026-04-30", "cuenta": "STG-CC", "fuente": "cartola", "comercio": "Transf a Carlos Carreño", "monto": 10000, "flow": "out", "cat": "Transferencias personas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chlcc-01", "fecha": "2026-05-04", "cuenta": "CHL-CC", "fuente": "cartola", "comercio": "Traspaso de Mathías Carrasco", "monto": 30580, "flow": "in", "cat": "Reembolso recibido", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chlcc-02", "fecha": "2026-05-05", "cuenta": "CHL-CC", "fuente": "cartola", "comercio": "Cargo por pago TC nacional", "monto": 1396555, "flow": "out", "cat": "Pago tarjeta", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chlcc-03", "fecha": "2026-05-05", "cuenta": "CHL-CC", "fuente": "cartola", "comercio": "Pago TC internacional", "monto": 66318, "flow": "out", "cat": "Pago tarjeta", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chlcc-04", "fecha": "2026-05-05", "cuenta": "CHL-CC", "fuente": "cartola", "comercio": "Traspaso de Nicholas Parker (propia)", "monto": 1228808, "flow": "in", "cat": "Traspaso propio", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chlcc-05", "fecha": "2026-05-15", "cuenta": "CHL-CC", "fuente": "cartola", "comercio": "Traspaso de Josefina Bravo (reemb. Airbnb)", "monto": 50224, "flow": "in", "cat": "Reembolso recibido", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-01", "fecha": "2026-05-01", "cuenta": "STG-TC", "fuente": "estado", "comercio": "Google Play YouTube", "monto": 11000, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-02", "fecha": "2026-05-04", "cuenta": "STG-TC", "fuente": "estado", "comercio": "Monto cancelado (pago)", "monto": 150545, "flow": "in", "cat": "Pago tarjeta", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-03", "fecha": "2026-05-12", "cuenta": "STG-TC", "fuente": "estado", "comercio": "Patreon Membership", "monto": 5452, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "USD", "monto_orig": 5.95, "ciudad": "", "cuota": null}, {"id": "stgtc-04", "fecha": "2026-05-12", "cuenta": "STG-TC", "fuente": "estado", "comercio": "MetLife Seguros (PAT)", "monto": 121485, "flow": "out", "cat": "Seguros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-05", "fecha": "2026-05-20", "cuenta": "STG-TC", "fuente": "estado", "comercio": "EBW TCOMP DIF", "monto": 12138, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-06", "fecha": "2026-05-20", "cuenta": "STG-TC", "fuente": "estado", "comercio": "Comisión TC fuera de plan", "monto": 4848, "flow": "out", "cat": "Comisiones e impuestos", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-07", "fecha": "2026-05-20", "cuenta": "STG-TC", "fuente": "estado", "comercio": "Reverso comisión adm.", "monto": 3434, "flow": "in", "cat": "Comisiones e impuestos", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-08", "fecha": "2026-05-28", "cuenta": "STG-TC", "fuente": "estado", "comercio": "IVA uso internacional", "monto": 36, "flow": "out", "cat": "Comisiones e impuestos", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "stgtc-09", "fecha": "2026-05-28", "cuenta": "STG-TC", "fuente": "estado", "comercio": "Servicio compra internacional", "monto": 190, "flow": "out", "cat": "Comisiones e impuestos", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chltc-001", "fecha": "2026-05-14", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Microsoft (PAT)", "monto": 1990, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-002", "fecha": "2026-04-22", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Kushki SimplePark", "monto": 1250, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-003", "fecha": "2026-04-23", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 1700, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-004", "fecha": "2026-04-23", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Spid General Holley", "monto": 5002, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-005", "fecha": "2026-04-23", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Aramco", "monto": 4700, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-006", "fecha": "2026-04-24", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Shell File 160", "monto": 25000, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-007", "fecha": "2026-04-26", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 1850, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-008", "fecha": "2026-04-27", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 1800, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-009", "fecha": "2026-04-28", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "OneClick Recurrente", "monto": 12990, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-010", "fecha": "2026-04-28", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Sabores de Mita", "monto": 6710, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "PROVIDENCIA", "cuota": null}, {"id": "chltc-011", "fecha": "2026-04-28", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Maxik", "monto": 990, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-012", "fecha": "2026-04-29", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 1700, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-013", "fecha": "2026-04-29", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "DLocal Prime Video", "monto": 6490, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-014", "fecha": "2026-04-30", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Decathlon Costanera", "monto": 28000, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-015", "fecha": "2026-04-30", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "SumUp Metropol", "monto": 27280, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "VITACURA", "cuota": null}, {"id": "chltc-016", "fecha": "2026-04-30", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MercadoPago Mercado", "monto": 57909, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-017", "fecha": "2026-04-30", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Zhong Li Limitada", "monto": 7260, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-018", "fecha": "2026-04-30", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Aramco", "monto": 1580, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-019", "fecha": "2026-05-01", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "PayU Uber Trip", "monto": 8599, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-020", "fecha": "2026-05-02", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 1600, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-021", "fecha": "2026-05-02", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "CCU", "monto": 1200, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-022", "fecha": "2026-05-03", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 10000, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-023", "fecha": "2026-05-03", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "PayU Uber Trip", "monto": 7501, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-024", "fecha": "2026-05-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Jumbo Alto Las Condes", "monto": 25443, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-025", "fecha": "2026-05-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Salcobrand Padre Hurtado", "monto": 9988, "flow": "out", "cat": "Farmacia", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-026", "fecha": "2026-05-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 1500, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-027", "fecha": "2026-05-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "McDonald's", "monto": 11280, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-028", "fecha": "2026-05-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Google Play YouTube", "monto": 2690, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-029", "fecha": "2026-05-05", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Ahum L195 Irarrázaval", "monto": 11899, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "CONCEPCIÓN", "cuota": null}, {"id": "chltc-030", "fecha": "2026-05-05", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MercadoPago AIP", "monto": 1800, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-031", "fecha": "2026-05-05", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec Arcoprime", "monto": 46659, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "TALCA", "cuota": null}, {"id": "chltc-032", "fecha": "2026-05-05", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "SC Bosques de Itata", "monto": 4400, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "TOMÉ", "cuota": null}, {"id": "chltc-033", "fecha": "2026-05-05", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MercadoPago StreatB", "monto": 21480, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-034", "fecha": "2026-05-05", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec", "monto": 95109, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-035", "fecha": "2026-05-06", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Crepúsculo", "monto": 11080, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "TALCAHUANO", "cuota": null}, {"id": "chltc-036", "fecha": "2026-05-06", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Crepúsculo", "monto": 1230, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "TALCAHUANO", "cuota": null}, {"id": "chltc-037", "fecha": "2026-05-07", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 53158, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-038", "fecha": "2026-05-07", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Pronto Barra Lautaro", "monto": 850, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAUTARO", "cuota": null}, {"id": "chltc-039", "fecha": "2026-05-07", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Pronto Barra Lautaro", "monto": 1990, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAUTARO", "cuota": null}, {"id": "chltc-040", "fecha": "2026-05-07", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 17680, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-041", "fecha": "2026-05-07", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 57372, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-042", "fecha": "2026-05-08", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 55027, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "VALDIVIA", "cuota": null}, {"id": "chltc-043", "fecha": "2026-05-10", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "PayU Uber Trip", "monto": 12495, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-044", "fecha": "2026-05-10", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 74879, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-045", "fecha": "2026-05-10", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "PayU Uber Trip", "monto": 8889, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-046", "fecha": "2026-05-10", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Nave El Trauco (ferry)", "monto": 21500, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "PUERTO MONTT", "cuota": null}, {"id": "chltc-047", "fecha": "2026-05-11", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Kako", "monto": 4700, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "ANCUD", "cuota": null}, {"id": "chltc-048", "fecha": "2026-05-11", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "DLocal Prime Video", "monto": 1900, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-049", "fecha": "2026-05-12", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Soc. Comercial Diara", "monto": 81486, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "ANCUD", "cuota": null}, {"id": "chltc-050", "fecha": "2026-05-13", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Teja Market", "monto": 25000, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "VALDIVIA", "cuota": null}, {"id": "chltc-051", "fecha": "2026-05-13", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "TUU Ventanitas de H.", "monto": 12100, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "HUILLINCO", "cuota": null}, {"id": "chltc-052", "fecha": "2026-05-13", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "TUU Parador Darwin", "monto": 40000, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "CUCAO", "cuota": null}, {"id": "chltc-053", "fecha": "2026-05-14", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "PN Chile (parque nac.)", "monto": 7800, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "CHILOÉ", "cuota": null}, {"id": "chltc-054", "fecha": "2026-05-14", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MercadoPago Agromat", "monto": 2400, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-055", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Kataik Adicional", "monto": 21500, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "PUERTO MONTT", "cuota": null}, {"id": "chltc-056", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 69034, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-057", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vivemarket Ltda.", "monto": 5600, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "OSORNO", "cuota": null}, {"id": "chltc-058", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MercadoPago Roberto", "monto": 1500, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-059", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Plaza Troncal 4 Vientos", "monto": 3600, "flow": "out", "cat": "Peajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "OSORNO", "cuota": null}, {"id": "chltc-060", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Cooperativa El Chil", "monto": 60350, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-061", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Donaciones FALP", "monto": 7000, "flow": "out", "cat": "Donaciones", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-062", "fecha": "2026-05-15", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Nazareno", "monto": 3500, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "ANCUD", "cuota": null}, {"id": "chltc-063", "fecha": "2026-05-16", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Peaje Troncal Púa", "monto": 3600, "flow": "out", "cat": "Peajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "VICTORIA", "cuota": null}, {"id": "chltc-064", "fecha": "2026-05-16", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 71678, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-065", "fecha": "2026-05-16", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Comercial Quintuyén", "monto": 19500, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-066", "fecha": "2026-05-16", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 42508, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-067", "fecha": "2026-05-16", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Pronto Barra Freire", "monto": 5280, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "FREIRE", "cuota": null}, {"id": "chltc-068", "fecha": "2026-05-16", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Peaje Troncal Quepe", "monto": 3600, "flow": "out", "cat": "Peajes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "FREIRE", "cuota": null}, {"id": "chltc-069", "fecha": "2026-05-17", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 59971, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-070", "fecha": "2026-05-17", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Streat Burger", "monto": 21480, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-071", "fecha": "2026-05-17", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "PayU Uber Eats", "monto": 23895, "flow": "out", "cat": "Delivery", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-072", "fecha": "2026-05-17", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "BL T2 OC", "monto": 13940, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-073", "fecha": "2026-05-17", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Sin descripción", "monto": 50000, "flow": "out", "cat": "Otros", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-074", "fecha": "2026-05-18", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Sabores de Mita", "monto": 6710, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "PROVIDENCIA", "cuota": null}, {"id": "chltc-075", "fecha": "2026-05-18", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Vida Parque", "monto": 2000, "flow": "out", "cat": "Estacionamiento", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-076", "fecha": "2026-05-18", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MercadoPago BIP (recarga)", "monto": 10000, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "LAS CONDES", "cuota": null}, {"id": "chltc-077", "fecha": "2026-05-18", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Jumbo Costanera Center", "monto": 4610, "flow": "out", "cat": "Supermercado", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-078", "fecha": "2026-05-19", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "McDonald's", "monto": 10080, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-079", "fecha": "2026-05-19", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Elsa Providencia", "monto": 19919, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-080", "fecha": "2026-05-19", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Copec App", "monto": 87283, "flow": "out", "cat": "Combustible", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-081", "fecha": "2026-05-19", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Centro Veterinario", "monto": 12000, "flow": "out", "cat": "Mascotas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "SANTIAGO", "cuota": null}, {"id": "chltc-pago", "fecha": "2026-05-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Pago Pesos TEF (período anterior)", "monto": 1396555, "flow": "in", "cat": "Pago tarjeta", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chltc-com", "fecha": "2026-05-20", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Comisión mensual mantención", "monto": 4851, "flow": "out", "cat": "Comisiones e impuestos", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}, {"id": "chlcuo-1", "ciclo": "2026-05", "fecha": "2025-10-06", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MP Sony", "monto": 291413, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": {"total": 3496966, "n": 8, "de": 12, "valor": 291413, "pagado": 2331304, "pendiente": 1165652}}, {"id": "chlcuo-2", "ciclo": "2026-05", "fecha": "2025-11-09", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Mercado Pago 4 TCOM", "monto": 24666, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": {"total": 296000, "n": 7, "de": 12, "valor": 24666, "pagado": 172662, "pendiente": 123330}}, {"id": "chlcuo-3", "ciclo": "2026-05", "fecha": "2026-01-04", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Cardinale Apumanque", "monto": 31156, "flow": "out", "cat": "Restaurantes", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": {"total": 186940, "n": 5, "de": 6, "valor": 31156, "pagado": 155780, "pendiente": 31156}}, {"id": "chlcuo-4", "ciclo": "2026-05", "fecha": "2026-02-10", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "MP Mercado Libre", "monto": 31650, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": {"total": 189900, "n": 4, "de": 6, "valor": 31650, "pagado": 126600, "pendiente": 63300}}, {"id": "chlcuo-5", "ciclo": "2026-05", "fecha": "2026-03-11", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Petco Chile", "monto": 21864, "flow": "out", "cat": "Mascotas", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": {"total": 65592, "n": 2, "de": 3, "valor": 21864, "pagado": 43728, "pendiente": 21864}}, {"id": "chlcuo-6", "ciclo": "2026-05", "fecha": "2026-04-11", "cuenta": "CHL-TC", "fuente": "estado", "comercio": "Falabella Los Dominicos", "monto": 31660, "flow": "out", "cat": "Compras", "excl": false, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": {"total": 94980, "n": 1, "de": 3, "valor": 31660, "pagado": 31660, "pendiente": 63320}}, {"id": "chlint-1", "fecha": "2026-04-30", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Uber / Lime", "monto": 1025, "flow": "out", "cat": "Transporte", "excl": false, "moneda": "USD-bill", "monto_orig": 1.14, "ciudad": "Ámsterdam", "cuota": null}, {"id": "chlint-2", "fecha": "2026-05-05", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Airbnb", "monto": 64926, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "USD-bill", "monto_orig": 71.28, "ciudad": "GB", "cuota": null}, {"id": "chlint-3", "fecha": "2026-05-08", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Airbnb", "monto": 156366, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "USD-bill", "monto_orig": 175.21, "ciudad": "GB", "cuota": null}, {"id": "chlint-4", "fecha": "2026-05-10", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Airbnb", "monto": 84096, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "USD-bill", "monto_orig": 94.33, "ciudad": "GB", "cuota": null}, {"id": "chlint-5", "fecha": "2026-05-14", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "OpenAI ChatGPT", "monto": 21682, "flow": "out", "cat": "Suscripciones", "excl": false, "moneda": "USD-bill", "monto_orig": 23.8, "ciudad": "US", "cuota": null}, {"id": "chlint-6", "fecha": "2026-05-15", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Airbnb (reemb. Josefina)", "monto": 50224, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "USD-bill", "monto_orig": 56.31, "ciudad": "GB", "cuota": null}, {"id": "chlint-7", "fecha": "2026-05-16", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Airbnb", "monto": 37376, "flow": "out", "cat": "Viajes", "excl": false, "moneda": "USD-bill", "monto_orig": 41.25, "ciudad": "GB", "cuota": null}, {"id": "chlint-pago", "fecha": "2026-05-04", "cuenta": "CHL-TC-INT", "fuente": "estado", "comercio": "Pago Dólar TEF (período anterior)", "monto": 65009, "flow": "in", "cat": "Pago tarjeta", "excl": true, "moneda": "CLP", "monto_orig": null, "ciudad": "", "cuota": null}];
+//</DATA>
+
+const CATS = ["Combustible","Transporte","Estacionamiento","Peajes","Supermercado",
+ "Restaurantes","Delivery","Farmacia","Suscripciones","Seguros","CAE/Crédito","Viajes","Mascotas",
+ "Compras","Donaciones","Servicios/Cuentas","Transferencias personas",
+ "Comisiones e impuestos","Pago tarjeta","Traspaso propio","Sueldo/Ingreso",
+ "Reembolso recibido","Otros"];
+const FIJO = new Set(["Suscripciones","Seguros","CAE/Crédito","Comisiones e impuestos"]);
+
+const ACC = {
+ "STG-CC":{s:"STG CC", c:"#EC1C3D"},"STG-TC":{s:"STG TC", c:"#EC1C3D"},
+ "CHL-CC":{s:"CHL CC", c:"#3460E0"},"CHL-TC":{s:"CHL TC", c:"#3460E0"},"CHL-TC-INT":{s:"CHL INT", c:"#3460E0"},
+};
+const BANKS = {
+  STG:{label:"Santander", color:"#EC1C3D", accts:["STG-CC","STG-TC"]},
+  CHL:{label:"Banco de Chile", color:"#3460E0", accts:["CHL-CC","CHL-TC","CHL-TC-INT"]},
+};
+// ======= CONFIG POR CICLO — actualizar al conciliar cada estado de cuenta =======
+// clave = año-mes de cierre del ciclo BdC (ciclo "2026-05" = 21/04 – 20/05)
+const CICLO_INFO = {
+  "2026-05":{bdc:{pagar:2024283,intl:463.62,fact:"20/05",vence:"08/06"},stg:{pagar:151716,fact:"28/05",vence:"15/06"}},
+};
+// Ventanas de gasto de vacaciones (solo meses atípicos)
+const VAC_WINDOWS = [["2026-05-05","2026-05-17"],["2026-05-20","2026-05-23"]];
+// Reembolsos: id → categoría que netean; y reembolsos que netean vacaciones
+const REEMB_CAT = {"stgcc-18":"Transferencias personas","chlcc-01":"Transferencias personas"};
+const REEMB_VAC_IDS = new Set(["chlcc-05"]);
+const METLIFE_RE = /metlife/i;
+const RESERVA_CHL = 21974266;
+const PAL = ["#F2724B","#3460E0","#28BFA3","#F2B33D","#9B6BE6","#46AEE0","#EC5C7D","#7BBF4A","#E08A3C","#6C7A99","#C7CCD8"];
+const COL = {cons:"#F2724B", fijo:"#6271E6", cuota:"#28BFA3", save:"#27B07A", saveX:"#7BBF4A"};
+
+const MESES = [
+ {mes:"Ene", bdcTC:897404,  stgTC:150282, sStg:1794208, sChl:22003702, ahorro:600000, metlife:120071, cae:113823},
+ {mes:"Feb", bdcTC:1147365, stgTC:149814, sStg:68004,   sChl:22182127, ahorro:500000, metlife:119850, cae:0},
+ {mes:"Mar", bdcTC:1486208, stgTC:150948, sStg:2165117, sChl:22154369, ahorro:0,      metlife:120185, cae:114127},
+ {mes:"Abr", bdcTC:1396555, stgTC:150545, sStg:1885726, sChl:22127527, ahorro:0,      metlife:120322, cae:114127},
+ {mes:"May", bdcTC:2024283, stgTC:151716, sStg:null,    sChl:21974266, ahorro:0,      metlife:121485, cae:null, intl:463.62},
+].map(x=>({...x, ahorroX:Math.round(x.metlife*0.5)}));
+
+const SGO = new Set(["SANTIAGO","LAS CONDES","PROVIDENCIA","VITACURA",""]);
+const pp = x => String(x).padStart(2,"0");
+const cycleOf = f => { const [y,m,d]=f.split("-").map(Number); let cm=m,cy=y; if(d>=21){cm++; if(cm>12){cm=1;cy++;}} return cy+"-"+pp(cm); };
+const cycleTx = t => t.ciclo || cycleOf(t.fecha);
+const MESN=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const cycleLabel = c => { const [y,m]=c.split("-").map(Number); let pm=m-1,py=y; if(pm<1){pm=12;py--;} return "21 "+MESN[pm-1]+(py!==y?" "+py:"")+" – 20 "+MESN[m-1]+" "+y; };
+const cycleAdd=(c,k)=>{let [y,m]=c.split("-").map(Number); m+=k; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return y+"-"+pp(m);};
+const cycleDiff=(a,b)=>{const [ya,ma]=a.split("-").map(Number),[yb,mb]=b.split("-").map(Number); return (ya-yb)*12+(ma-mb);};
+const mesNom=c=>{const [y,m]=c.split("-").map(Number); return MESN[m-1]+" "+y;};
+const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malformadas
+const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
+const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
+const CICLO_HOY=cycleOf(HOY);
+const BUILD="2026-07-12 v8";  // actualizar al editar el archivo: sirve para detectar copias en caché
+// ====== GASTOS FIJOS ESPERADOS ======
+// Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
+// Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
+const FIJOS_CSV_URL = "https://docs.google.com/spreadsheets/d/1NyFBoli9AivCwq70tW8Bxg3-ACYomfg5T5GXr68R8QM/gviz/tq?tqx=out:csv";
+const FIJOS_DEF = [
+ {nombre:"MetLife Seguros", categoria:"Seguros", monto:121485, dia:12, patron:"metlife", activo:true},
+ {nombre:"PAC Seguro Auto", categoria:"Seguros", monto:30280, dia:6, patron:"seguro auto", activo:true},
+ {nombre:"CAE", categoria:"CAE/Crédito", monto:114127, dia:2, patron:"cae", activo:true},
+ {nombre:"YouTube Premium", categoria:"Suscripciones", monto:11000, dia:1, patron:"youtube", activo:true},
+ {nombre:"Google Play YouTube", categoria:"Suscripciones", monto:2690, dia:4, patron:"google play", activo:true},
+ {nombre:"Prime Video", categoria:"Suscripciones", monto:6490, dia:29, patron:"prime video", activo:true},
+ {nombre:"Microsoft 365", categoria:"Suscripciones", monto:1990, dia:14, patron:"microsoft", activo:true},
+ {nombre:"Patreon", categoria:"Suscripciones", monto:5452, dia:12, patron:"patreon", activo:true},
+ {nombre:"ChatGPT", categoria:"Suscripciones", monto:21682, dia:14, patron:"openai", activo:true},
+ {nombre:"Comisión TC BdC", categoria:"Comisiones e impuestos", monto:4851, dia:20, patron:"comisi", activo:true},
+];
+const parseFijosCSV = txt => {
+  const out=[];let row=[],cur="",q=false;
+  for(let i=0;i<txt.length;i++){const c=txt[i];
+    if(q){ if(c==='"'){ if(txt[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
+    else if(c==='"') q=true;
+    else if(c===','){row.push(cur);cur="";}
+    else if(c==='\n'||c==='\r'){ if(cur!==""||row.length){row.push(cur);out.push(row);row=[];cur="";} if(c==='\r'&&txt[i+1]==='\n')i++; }
+    else cur+=c;
+  }
+  if(cur!==""||row.length){row.push(cur);out.push(row);}
+  const [hdr,...body]=out; if(!hdr) return [];
+  const H=hdr.map(h=>h.trim().toLowerCase());
+  const g=(r,k)=>{const ix=H.indexOf(k);return ix>=0?(r[ix]||"").trim():"";};
+  return body.filter(r=>g(r,"nombre")).map(r=>({
+    nombre:g(r,"nombre"), categoria:g(r,"categoria")||"Otros",
+    monto:Number(g(r,"monto").replace(/[^0-9\-]/g,""))||0,
+    dia:Number(g(r,"dia"))||1, patron:(g(r,"patron")||g(r,"nombre")).toLowerCase(),
+    activo:!["false","0","no"].includes(g(r,"activo").toLowerCase()),
+  }));
+};
+// fecha esperada de un fijo dentro de un ciclo (ciclo c termina el 20 del mes m)
+const fechaEsp=(c,dia)=>{const [y,m]=c.split("-").map(Number); let mm=m,yy=y; if(dia>=21){mm=m-1; if(mm<1){mm=12;yy--;}} return yy+"-"+pp(mm)+"-"+pp(dia); };
+// ====== FUENTE REMOTA ======
+// URL /exec del Web App de Apps Script que sirve el bloque DATA del HTML en Drive
+// (ver apps_script_datos.txt). Vacía => la app usa solo los datos embebidos.
+const REMOTE_URL = "https://script.google.com/macros/s/AKfycbzHHGuSfrc72Api2UW6PUV8un82QzRyxp92TcOIRy7AESs0VnERx8k_q6dmZmDhTw0Bnw/exec";
+const inWin = f => VAC_WINDOWS.some(([a,b])=>f>=a&&f<=b);
+const heurVac = t => t.flow==="out"&&!t.excl&&inWin(t.fecha)&&t.cat!=="Suscripciones"
+  && (t.cuenta==="CHL-TC-INT" || !SGO.has(t.ciudad||""));
+
+const clp = n => new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(Math.round(n));
+const clpK = n => "$"+(n/1e6).toFixed(n>=1e6?1:2)+"M";
+const usd = n => "US$"+new Intl.NumberFormat("es-CL",{minimumFractionDigits:2,maximumFractionDigits:2}).format(n);
+const fdate = s => { const [,m,d]=s.split("-"); return d+"/"+m; };
+
+const useMobile = () => {
+  const [mb,setMb]=useState(()=>window.matchMedia("(max-width:760px)").matches);
+  useEffect(()=>{
+    const mq=window.matchMedia("(max-width:760px)");
+    const h=e=>setMb(e.matches);
+    mq.addEventListener?mq.addEventListener("change",h):mq.addListener(h);
+    return()=>{mq.removeEventListener?mq.removeEventListener("change",h):mq.removeListener(h);};
+  },[]);
+  return mb;
+};
+
+// Persistencia: window.storage (entorno Claude) con fallback a localStorage (navegador normal)
+const store = {
+  async get(k){ try{ if(window.storage){const g=await window.storage.get(k); return g?g.value:null;} }catch(e){}
+    try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  async set(k,v){ try{ if(window.storage){ await window.storage.set(k,v,false); return; } }catch(e){}
+    try{ localStorage.setItem(k,v); }catch(e){} },
+  async list(p){ try{ if(window.storage){const r=await window.storage.list(p); if(r&&r.keys) return r.keys;} }catch(e){}
+    try{ return Object.keys(localStorage).filter(k=>k.startsWith(p)); }catch(e){ return []; } },
+};
+
+const CSS = `
+.wrap{--ink:#2A2F3B;--paper:#F6F8FC;--panel:#FFFFFF;--line:#E8EBF2;--muted:#8A90A0;
+ --cons:#F2724B;--fijo:#6271E6;--cuota:#1FB39A;--save:#27B07A;--accent:#3460E0;
+ background:var(--paper);color:var(--ink);min-height:100%;
+ font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45;}
+.wrap *{box-sizing:border-box;}
+.num{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+.eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.h1{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:2px 0 0;}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:13px;}
+.tabs{display:inline-flex;background:#E9EDF7;border-radius:10px;padding:3px;margin-top:14px;}
+.tabs button{font:inherit;font-size:13px;font-weight:600;padding:7px 16px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;}
+.tabs button.on{background:#fff;color:var(--accent);box-shadow:0 1px 3px rgba(40,70,160,.14);}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:12px;}
+.card{padding:15px 17px;border-radius:13px;border:1px solid var(--line);}
+.card .lbl{font-size:11.5px;color:var(--muted);font-weight:600;}
+.card .big{font-size:23px;font-weight:700;margin-top:6px;letter-spacing:-.02em;}
+.card .sub{font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.55;}
+.sectitle{font-size:13px;font-weight:700;}
+.reserva{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);background:#EEF1F8;border:1px dashed #CFD6E6;border-radius:10px;padding:8px 12px;}
+.editbox{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:7px;padding:1px 6px;background:#fff;}
+.editbox input{font:inherit;font-family:"JetBrains Mono",monospace;font-size:13px;border:0;background:transparent;width:74px;color:var(--ink);outline:none;}
+.stackbar{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-top:12px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.02);}
+.stackbar > i{display:block;height:100%;}
+.lg{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;}
+.lg .it{display:flex;align-items:center;gap:7px;font-size:12px;}
+.lg .dot{width:11px;height:11px;border-radius:4px;}
+.aside{margin-top:11px;font-size:12px;color:var(--muted);background:#FFF7F2;border:1px solid #FBE2D5;border-radius:9px;padding:8px 11px;}
+.saverow{display:flex;gap:14px;flex-wrap:wrap;margin-top:13px;}
+.savecard{flex:1;min-width:180px;border-radius:12px;padding:13px 15px;}
+.savecard .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;}
+.savecard .v{font-size:19px;font-weight:700;margin-top:4px;}
+.bankcard{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;}
+.bankcard .top{height:5px;}
+.bankcard .body{padding:13px 15px;display:flex;justify-content:space-between;gap:10px;}
+.bankcard .col .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+.bankcard .col .v{font-size:18px;font-weight:700;margin-top:3px;}
+.legend{display:flex;flex-direction:column;gap:6px;}
+.legend .row{display:flex;align-items:center;gap:8px;font-size:12px;}
+.legend .dot{width:10px;height:10px;border-radius:3px;flex:none;}
+.legend .nm{flex:1;}
+.bar{height:9px;border-radius:6px;background:#EDF0F6;overflow:hidden;}
+.bar > i{display:block;height:100%;border-radius:6px;}
+.cuoSum{display:flex;gap:18px;padding:11px 13px;background:#E9FBF6;border:1px solid #C7F0E6;border-radius:10px;margin-bottom:13px;}
+.cuoSum .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);}
+td{padding:8px 10px;border-bottom:1px solid #F1F3F8;font-size:13px;vertical-align:middle;}
+tr.excl td{color:#AEB3C0;} tr.vac{background:#FFF7F2;}
+.rt{text-align:right;}
+select.cat{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:7px;padding:4px 6px;background:#fff;color:var(--ink);max-width:150px;}
+select.cat.edited{border-color:var(--accent);background:#EEF3FF;font-weight:600;}
+input.search,select.filt{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;color:var(--ink);}
+.chip{font-size:11px;color:var(--muted);}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
+.toggle button{font:inherit;font-size:12px;font-weight:600;padding:5px 11px;border:0;background:#fff;color:var(--muted);cursor:pointer;}
+.toggle button.on{background:var(--accent);color:#fff;}
+.tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;}
+.bk{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;cursor:pointer;border:1px solid transparent;white-space:nowrap;}
+.mtab td,.mtab th{font-size:12px;}
+.mtab td.n{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;text-align:right;}
+.mtab{min-width:640px;}
+.main{max-width:1120px;margin:0 auto;padding:22px 20px 40px;}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px;}
+.donutrow{display:flex;gap:14px;margin-top:8px;align-items:center;}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.btnx{font:inherit;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;color:var(--accent);cursor:pointer;}
+.fijorow{display:flex;gap:11px;align-items:center;padding:10px 2px;border-bottom:1px solid #F1F3F8;}
+.fijorow:last-child{border-bottom:0;}
+.fijorow .fi{flex:1;min-width:0;}
+.fijorow .nm{font-size:13.5px;font-weight:600;}
+.fijorow input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#27B07A;}
+.txcard{padding:11px 4px;border-bottom:1px solid #F1F3F8;}
+.txcard.excl{opacity:.6;}
+.txcard.vac{background:#FFF7F2;}
+.txcard .r1{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);flex-wrap:wrap;}
+.txcard .amt{margin-left:auto;font-size:14.5px;font-weight:700;}
+.txcard .mer{font-size:13.5px;margin-top:4px;color:var(--ink);}
+.txcard .r3{display:flex;gap:8px;align-items:center;margin-top:8px;}
+.txcard .r3 select.cat{flex:1;max-width:none;padding:8px;}
+.txcard .bk{padding:7px 11px;border-radius:8px;}
+@media(max-width:760px){
+ .main{padding:14px 12px 40px;}
+ .h1{font-size:20px;}
+ .reserva{width:100%;}
+ .tabs{display:flex;width:100%;}
+ .tabs button{flex:1;padding:10px 6px;}
+ .grid2{grid-template-columns:1fr;gap:11px;}
+ .cardgrid{grid-template-columns:1fr 1fr;gap:9px;}
+ .card{padding:12px 12px;}
+ .card .big{font-size:18px;}
+ .savecard{min-width:145px;padding:12px 13px;}
+ .savecard .v{font-size:17px;}
+ .bankcard .body{flex-direction:column;gap:9px;}
+ .bankcard .col.rt{text-align:left;}
+ .donutrow{flex-direction:column;}
+ .donutrow .legend{width:100%;}
+ .cuoSum{flex-wrap:wrap;gap:12px;}
+ .filters .sectitle{flex:1 1 100%;margin-right:0!important;}
+ .filters .search{flex:1 1 100%;min-width:0;}
+ select.filt{flex:1;min-width:0;}
+ .lg{gap:10px 14px;}
+}
+@media(max-width:380px){.cardgrid{grid-template-columns:1fr;}}
+`;
+
+function App(){
+  const [tab,setTab]=useState("periodo");
+  const [ovr,setOvr]=useState({});
+  const [vac,setVac]=useState(null);
+  const [ready,setReady]=useState(false);
+  const [meta,setMeta]=useState(700000);
+  const [fAcc,setFAcc]=useState("todas");
+  const [fCat,setFCat]=useState("todas");
+  const [q,setQ]=useState("");
+  const [showExcl,setShowExcl]=useState(false);
+  const [ciclo,setCiclo]=useState(CICLOS.includes(CICLO_HOY)?CICLO_HOY:CICLOS[0]);
+  const [vacKeys,setVacKeys]=useState(new Set());
+  const [rows0,setRows0]=useState(DATA_C);
+  const [fuente,setFuente]=useState(REMOTE_URL?"cargando remota…":"embebida");
+  const [fijos,setFijos]=useState(FIJOS_DEF);
+  const [fuenteFijos,setFuenteFijos]=useState(FIJOS_CSV_URL?"cargando…":"lista embebida");
+  const [fijoChk,setFijoChk]=useState({});
+  const vacStored=useRef({});
+  const mobile=useMobile();
+
+  useEffect(()=>{(async()=>{
+    let o={}, v={};
+    try{
+      for(const k of await store.list("cat:")){const g=await store.get(k);if(g!=null)o[k.slice(4)]=g;}
+      for(const k of await store.list("vac:")){const g=await store.get(k);if(g!=null)v[k.slice(4)]=g==="1";}
+      const mg=parseInt(await store.get("meta")); if(!isNaN(mg)&&mg>0)setMeta(mg);
+      const fc={}; for(const k of await store.list("fijo:")){const g=await store.get(k);if(g==="1")fc[k.slice(5)]=true;}
+      setFijoChk(fc);
+    }catch(e){}
+    vacStored.current=v;
+    setOvr(o); setVacKeys(new Set(Object.keys(v))); setReady(true);
+  })()},[]);
+
+  // fuente remota de datos (si está configurada); ante error se mantienen los embebidos
+  useEffect(()=>{ if(!REMOTE_URL) return; (async()=>{
+    try{
+      const r=await fetch(REMOTE_URL+(REMOTE_URL.includes("?")?"&":"?")+"t="+Date.now());
+      const j=await r.json();
+      if(Array.isArray(j)&&j.length&&j[0].id&&j[0].fecha){ setRows0(j); setFuente("remota · "+new Date().toTimeString().slice(0,5)); }
+      else setFuente("embebida (respuesta remota inválida)");
+    }catch(e){ setFuente("embebida (remota no disponible)"); }
+  })();},[]);
+
+  // lista de gastos fijos desde Google Sheet publicada (si está configurada)
+  useEffect(()=>{ if(!FIJOS_CSV_URL) return; (async()=>{
+    try{
+      const r=await fetch(FIJOS_CSV_URL+(FIJOS_CSV_URL.includes("?")?"&":"?")+"t="+Date.now());
+      const arr=parseFijosCSV(await r.text());
+      if(arr.length){ setFijos(arr); setFuenteFijos("Google Sheet"); }
+      else setFuenteFijos("lista embebida (sheet vacía)");
+    }catch(e){ setFuenteFijos("lista embebida (sheet no disponible)"); }
+  })();},[]);
+
+  // vacaciones: override guardado > heurística; se recalcula si llegan filas nuevas
+  useEffect(()=>{ if(!ready) return;
+    setVac(p=>{const np={...(p||{})}; rows0.forEach(t=>{ if(!(t.id in np)) np[t.id]=(t.id in vacStored.current)?vacStored.current[t.id]:heurVac(t); }); return np;});
+  },[rows0,ready]);
+
+  const setCat=(id,c)=>{ setOvr(p=>({...p,[id]:c})); store.set("cat:"+id,c); };
+  const toggleVac=(id)=>{ setVac(p=>{const nv={...p,[id]:!p[id]}; store.set("vac:"+id,nv[id]?"1":"0"); return nv;}); setVacKeys(p=>new Set(p).add(id)); };
+  const saveMeta=(x)=>{ setMeta(x); store.set("meta",String(x)); };
+  const exportOvr=async()=>{
+    const v={}; vacKeys.forEach(id=>{ if(vac&&(id in vac)) v[id]=vac[id]; });
+    const payload=JSON.stringify({meta,cat:ovr,vac:v},null,1);
+    try{ await navigator.clipboard.writeText(payload); alert("Cambios copiados al portapapeles: "+Object.keys(ovr).length+" categorías, "+Object.keys(v).length+" marcas de vacaciones."); }
+    catch(e){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([payload],{type:"application/json"})); a.download="overrides_finanzas.json"; a.click(); }
+  };
+  const catOf=t=>ovr[t.id]||t.cat;
+  const bucketOf=t=>{ if(!vac) return "fijo"; if(vac[t.id]) return "vac"; if(t.cuota) return "cuota"; return FIJO.has(catOf(t))?"fijo":"cons"; };
+
+  const m=useMemo(()=>{
+    if(!vac) return null;
+    const inC=t=>cycleTx(t)===ciclo;
+    const out=rows0.filter(t=>t.flow==="out"&&!t.excl&&inC(t));
+    const sum=b=>out.filter(t=>bucketOf(t)===b).reduce((a,t)=>a+t.monto,0);
+    const cons=sum("cons"), fijo=sum("fijo"), cuota=sum("cuota"), vacb=sum("vac");
+    const reembVac=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
+    const reembCons=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&!REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
+    const consN=cons-reembCons, vacN=vacb-reembVac;
+    const byCat={};
+    out.filter(t=>bucketOf(t)!=="vac").forEach(t=>{const c=catOf(t);byCat[c]=(byCat[c]||0)+t.monto;});
+    Object.entries(REEMB_CAT).forEach(([id,c])=>{const t=rows0.find(x=>x.id===id);if(t&&inC(t))byCat[c]=(byCat[c]||0)-t.monto;});
+    const cats=Object.entries(byCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+    let donut=cats.slice(0,8); const rest=cats.slice(8).reduce((a,[,v])=>a+v,0);
+    if(rest>0) donut=[...donut,["Otros agrupados",rest]];
+    const gastBank=k=>BANKS[k].accts.reduce((a,acc)=>a+out.filter(t=>t.cuenta===acc).reduce((s,t)=>s+t.monto,0),0);
+    const cuoMap={};
+    rows0.filter(t=>t.cuota).forEach(t=>{const k=t.comercio+"|"+t.cuota.total+"|"+t.cuota.de;if(!cuoMap[k]||t.cuota.n>cuoMap[k].cuota.n)cuoMap[k]=t;});
+    const cuotas=Object.values(cuoMap).sort((a,b)=>b.cuota.pendiente-a.cuota.pendiente);
+    const proxMes=cuotas.filter(t=>t.cuota.n<t.cuota.de).reduce((a,t)=>a+t.cuota.valor,0);
+    const compromiso=cuotas.reduce((a,t)=>a+t.cuota.pendiente,0);
+    const met=rows0.find(t=>inC(t)&&METLIFE_RE.test(t.comercio)); const metX=met?Math.round(met.monto*0.5):0;
+    return {consN,fijo,cuota,vacN,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,proxMes,compromiso,metX};
+  },[ovr,vac,ciclo,rows0]);
+
+  const rows=useMemo(()=>rows0.filter(t=>{
+    if(cycleTx(t)!==ciclo) return false;
+    if(!showExcl&&t.excl) return false;
+    if(fAcc!=="todas"&&t.cuenta!==fAcc) return false;
+    if(fCat!=="todas"&&catOf(t)!==fCat) return false;
+    if(q&&!(t.comercio.toLowerCase().includes(q.toLowerCase())||(t.ciudad||"").toLowerCase().includes(q.toLowerCase()))) return false;
+    return true;
+  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0]);
+
+  const ciclosL=useMemo(()=>[...new Set(rows0.map(t=>cycleTx(t)))].sort().reverse(),[rows0]);
+  useEffect(()=>{ if(ciclosL.length&&!ciclosL.includes(ciclo)) setCiclo(ciclosL.includes(CICLO_HOY)?CICLO_HOY:ciclosL[0]); },[ciclosL]);
+
+  const toggleFijo=(nombre)=>{ const key=ciclo+"|"+nombre;
+    setFijoChk(p=>{const np={...p,[key]:!p[key]}; store.set("fijo:"+key,np[key]?"1":"0"); return np;}); };
+  const fijosView=useMemo(()=>fijos.filter(f=>f.activo).map(f=>{
+    const pat=(f.patron||f.nombre).toLowerCase();
+    const tx=rows0.find(t=>cycleTx(t)===ciclo&&t.flow==="out"&&!t.excl&&t.comercio.toLowerCase().includes(pat));
+    const manual=!!fijoChk[ciclo+"|"+f.nombre];
+    const pagado=!!tx||manual;
+    const fEsp=fechaEsp(ciclo,f.dia);
+    const atrasado=!pagado&&ciclo===CICLO_HOY&&fEsp<HOY;
+    return {...f,tx,manual,pagado,atrasado,fEsp,montoReal:tx?tx.monto:f.monto};
+  }).sort((a,b)=>a.fEsp<b.fEsp?-1:1),[fijos,rows0,ciclo,fijoChk]);
+
+  // cuotas proyectadas: avanza n desde el último estado conciliado hasta el ciclo actual
+  const cuotasView=useMemo(()=>{
+    if(!m) return {items:[],proy:[],totPend:0,carga:0,fin:null};
+    const items=m.cuotas.map(t=>{
+      const base=t.ciclo||cycleOf(t.fecha);
+      const elapsed=Math.max(0,cycleDiff(CICLO_HOY,base));
+      const nRaw=t.cuota.n+elapsed;
+      const restIncl=Math.max(0,t.cuota.de-nRaw+1);
+      const nAct=Math.min(nRaw,t.cuota.de);
+      const pend=restIncl*t.cuota.valor;
+      const ultimo=restIncl>0?cycleAdd(CICLO_HOY,restIncl-1):null;
+      return {...t,nAct,restIncl,pend,ultimo,estimado:elapsed>0,activa:restIncl>0};
+    }).sort((a,b)=>(a.activa===b.activa)?(a.pend<b.pend?1:-1):(a.activa?-1:1));
+    const maxRest=items.reduce((a,t)=>Math.max(a,t.restIncl),0);
+    const proy=[]; for(let k=0;k<maxRest;k++){
+      proy.push({c:cycleAdd(CICLO_HOY,k),monto:items.filter(t=>t.restIncl>k).reduce((a,t)=>a+t.cuota.valor,0)});
+    }
+    const totPend=items.reduce((a,t)=>a+t.pend,0);
+    return {items,proy,totPend,carga:proy.length?proy[0].monto:0,fin:proy.length?proy[proy.length-1].c:null};
+  },[m]);
+
+  if(!ready||!m) return <div className="wrap" style={{padding:24}}>Cargando…</div>;
+  const restante=meta-m.consN;
+  const ahorroBase=Math.max(restante,0);
+  const totBar=m.consN+m.fijo+m.cuota;
+  const totalDona=m.donut.reduce((a,[,v])=>a+v,0);
+  const BK={cons:{l:"Consumo",c:COL.cons},fijo:{l:"Fijo",c:COL.fijo},cuota:{l:"Cuota",c:COL.cuota},vac:{l:"✈ Vacaciones",c:"#E08A3C"}};
+  const chartMeses=MESES.map(x=>({mes:x.mes,"Banco de Chile":x.bdcTC,"Santander":x.stgTC}));
+  const chartAhorro=MESES.map(x=>({mes:x.mes,"Ahorro":x.ahorro,"Extra MetLife":x.ahorroX}));
+  const totAhorro=MESES.reduce((a,x)=>a+x.ahorro,0), totAhorroX=MESES.reduce((a,x)=>a+x.ahorroX,0);
+  const info=CICLO_INFO[ciclo];
+  const gastTC=rows0.filter(t=>t.flow==="out"&&!t.excl&&cycleTx(t)===ciclo&&t.cuenta.includes("TC")).reduce((a,t)=>a+t.monto,0);
+  const dataMax=rows0.reduce((a,t)=>t.fecha>a&&t.fecha<=HOY?t.fecha:a,"0000-00-00");
+  const diasSin=Math.max(0,Math.round((new Date(HOY)-new Date(dataMax))/864e5));
+  const totEsp=fijosView.reduce((a,f)=>a+f.monto,0);
+  const totPag=fijosView.filter(f=>f.pagado).reduce((a,f)=>a+f.montoReal,0);
+  const totPend=fijosView.filter(f=>!f.pagado).reduce((a,f)=>a+f.monto,0);
+
+  return (<div className="wrap">
+   <style>{CSS}</style>
+   <div className="main">
+    <div className="hdr">
+      <div><div className="eyebrow">Control de flujo personal</div><h1 className="h1">Mis finanzas</h1>
+        <div className="chip" style={{marginTop:3}}>build {BUILD} · datos al {fdate(dataMax)} · fuente {fuente}</div></div>
+      <div className="reserva"><span>🔒</span><span>Fondo a invertir (no disponible): <b className="num">{clp(RESERVA_CHL)}</b></span></div>
+    </div>
+    <div className="tabs">
+      <button className={tab==="periodo"?"on":""} onClick={()=>setTab("periodo")}>Período</button>
+      <button className={tab==="fijos"?"on":""} onClick={()=>setTab("fijos")}>Fijos</button>
+      <button className={tab==="cuotas"?"on":""} onClick={()=>setTab("cuotas")}>Cuotas</button>
+      <button className={tab==="meses"?"on":""} onClick={()=>setTab("meses")}>Meses</button>
+    </div>
+    {diasSin>2&&<div className="aside" style={{marginTop:10}}>⚠ Última transacción registrada: <b className="num">{fdate(dataMax)}</b> — hace {diasSin} días. Hay que procesar las notificaciones de Gmail nuevas (pídeselo a Claude).</div>}
+
+    {tab==="periodo" && <>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"12px 0 0"}}>
+      <span className="chip">Ciclo facturación BdC</span>
+      <select className="filt" value={ciclo} onChange={e=>setCiclo(e.target.value)} style={{padding:"5px 8px",fontSize:12}}>
+        {ciclosL.map(c=><option key={c} value={c}>{cycleLabel(c)+(c===CICLO_HOY?" · ciclo en curso":"")}</option>)}
+      </select>
+      {ciclo===CICLO_HOY&&<span className="chip" style={{color:"var(--save)",fontWeight:600}}>en curso · va en el día {HOY.slice(8)}</span>}
+      {!info&&<span className="chip">sin estado de cuenta aún — cifras provisorias desde notificaciones</span>}
+    </div>
+    <div className="cardgrid" style={{marginTop:10}}>
+      <div className="card" style={{background:COL.cons+"10",borderColor:COL.cons+"33"}}>
+        <div className="lbl">Consumo del mes <span className="chip">(variable)</span></div>
+        <div className="big num" style={{color:COL.cons}}>{clp(m.consN)}</div>
+        <div className="sub">meta <span className="editbox"><span style={{color:"var(--muted)"}}>$</span>
+          <input className="num" type="number" step="50000" value={meta} onChange={e=>saveMeta(Math.max(0,parseInt(e.target.value||"0")))}/></span>
+          {restante>=0 ? <> · sobran <b className="num" style={{color:"var(--save)"}}>{clp(restante)}</b></>
+                       : <> · <b style={{color:COL.cons}}>{clp(-restante)} sobre la meta</b></>}
+        </div>
+      </div>
+      <div className="card" style={{background:COL.fijo+"10",borderColor:COL.fijo+"33"}}>
+        <div className="lbl">Gastos fijos</div>
+        <div className="big num" style={{color:COL.fijo}}>{clp(m.fijo)}</div>
+        <div className="sub">suscripciones, seguros, CAE, comisiones</div>
+      </div>
+      <div className="card" style={{background:COL.cuota+"10",borderColor:COL.cuota+"33"}}>
+        <div className="lbl">Cuotas del mes</div>
+        <div className="big num" style={{color:COL.cuota}}>{clp(m.cuota)}</div>
+        <div className="sub">obligación temporal · {m.cuotas.length} compras vigentes</div>
+      </div>
+      <div className="card">
+        <div className="lbl">A pagar próxima facturación</div>
+        <div className="big num">{clp(info?info.bdc.pagar+info.stg.pagar:gastTC)}</div>
+        <div className="sub">{info?(info.bdc.intl?"+ "+usd(info.bdc.intl)+" internacional":"según estados de cuenta"):"estimado: gasto TC del ciclo, sin facturar aún"}</div>
+      </div>
+    </div>
+
+    <div className="panel" style={{marginTop:13,padding:"15px 18px"}}>
+      <div className="sectitle">Composición del gasto del período · {clp(totBar)}</div>
+      <div className="stackbar">
+        <i style={{width:(m.consN/totBar*100)+"%",background:COL.cons}}/>
+        <i style={{width:(m.fijo/totBar*100)+"%",background:COL.fijo}}/>
+        <i style={{width:(m.cuota/totBar*100)+"%",background:COL.cuota}}/>
+      </div>
+      <div className="lg">
+        <div className="it"><span className="dot" style={{background:COL.cons}}/>Consumo del mes <b className="num">{clp(m.consN)}</b></div>
+        <div className="it"><span className="dot" style={{background:COL.fijo}}/>Fijos <b className="num">{clp(m.fijo)}</b></div>
+        <div className="it"><span className="dot" style={{background:COL.cuota}}/>Cuotas <b className="num">{clp(m.cuota)}</b></div>
+      </div>
+      {m.vacN>0 && <div className="aside">✈ Gasto extraordinario marcado como vacaciones: <b className="num">{clp(m.vacN)}</b> — financiado con ahorro, no incluido arriba (aplica solo a meses atípicos).</div>}
+    </div>
+
+    <div className="saverow">
+      <div className="savecard" style={{background:COL.save+"12",border:"1px solid "+COL.save+"33"}}>
+        <div className="k" style={{color:COL.save}}>A ahorro este período</div>
+        <div className="v num" style={{color:COL.save}}>{clp(ahorroBase)}</div>
+        <div className="chip">lo que sobra de la meta de consumo</div>
+      </div>
+      <div className="savecard" style={{background:"#F4FAEF",border:"1px solid #DCEFC9"}}>
+        <div className="k" style={{color:"#5E8A2E"}}>Ahorro extra · 50% MetLife</div>
+        <div className="v num" style={{color:"#5E8A2E"}}>{clp(m.metX)}</div>
+        <div className="chip">no lo cuentas, pero igual acumula</div>
+      </div>
+    </div>
+
+    <div className="grid2">
+      {Object.entries(BANKS).map(([k,b])=>{const gast=k==="STG"?m.gastSTG:m.gastCHL;const bi=info?(k==="STG"?info.stg:info.bdc):null;return(
+        <div key={k} className="bankcard"><div className="top" style={{background:b.color}}/>
+          <div className="body">
+            <div className="col"><div className="k" style={{color:b.color}}>{b.label}</div>
+              <div style={{marginTop:9}}><div className="k">Gastado período</div><div className="v num" style={{color:COL.cons}}>{clp(gast)}</div></div></div>
+            <div className="col rt"><div className="k">{bi?"A pagar · fact "+bi.fact+" · vence "+bi.vence:"A pagar (sin estado aún)"}</div>
+              <div className="v num" style={{color:b.color}}>{bi?clp(bi.pagar):"—"}</div>
+              {bi&&bi.intl&&<div className="chip num" style={{color:b.color}}>+ {usd(bi.intl)}</div>}</div>
+          </div></div>);})}
+    </div>
+
+    <div className="grid2">
+      <div className="panel" style={{padding:"16px 18px"}}>
+        <div className="sectitle">Costo por categoría <span className="chip">sin vacaciones</span></div>
+        <div className="donutrow">
+          <div style={{width:160,height:160,position:"relative",flex:"none"}}>
+            <ResponsiveContainer width="100%" height="100%"><PieChart>
+              <Pie data={m.donut.map(([n,v])=>({name:n,value:v}))} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={76} stroke="none" paddingAngle={1}>
+                {m.donut.map((_,i)=><Cell key={i} fill={PAL[i%PAL.length]}/>)}
+              </Pie></PieChart></ResponsiveContainer>
+            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+              <div className="chip">total</div><div className="num" style={{fontWeight:700,fontSize:12.5}}>{clp(totalDona)}</div></div>
+          </div>
+          <div className="legend" style={{flex:1}}>
+            {m.donut.map(([n,v],i)=>(<div className="row" key={n}>
+              <span className="dot" style={{background:PAL[i%PAL.length]}}/><span className="nm">{n}</span>
+              <span className="num" style={{color:"var(--muted)"}}>{clp(v)}</span>
+              <span className="num chip" style={{width:36,textAlign:"right"}}>{Math.round(v/totalDona*100)}%</span></div>))}
+          </div>
+        </div>
+      </div>
+      <div className="panel" style={{padding:"16px 18px"}}>
+        <div className="sectitle">Compras en cuotas</div>
+        <div className="cuoSum" style={{marginTop:11}}>
+          <div><div className="k">A pagar próximo mes</div><div className="num" style={{fontSize:19,fontWeight:700,color:COL.cuota}}>{clp(m.proxMes)}</div></div>
+          <div><div className="k">Compromiso futuro total</div><div className="num" style={{fontSize:15,fontWeight:600,color:"var(--muted)",marginTop:3}}>{clp(m.compromiso)}</div></div>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
+          {m.cuotas.map(t=>{const c=t.cuota;const pct=c.pagado/c.total*100;return(<div key={t.id}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
+              <span>{t.comercio} <span className="chip">({c.n}/{c.de})</span></span><span className="num" style={{color:"var(--muted)"}}>{clp(c.total)}</span></div>
+            <div className="bar"><i style={{width:pct+"%",background:COL.cuota}}/></div>
+            <div className="num" style={{fontSize:11,color:"var(--muted)",marginTop:3}}>cuota {clp(c.valor)}/mes · pagado {clp(c.pagado)} · falta {clp(c.pendiente)}</div></div>)})}
+        </div>
+      </div>
+    </div>
+
+    <div className="panel" style={{marginTop:13,padding:"14px 16px 4px"}}>
+      <div className="filters">
+        <div className="sectitle" style={{marginRight:"auto"}}>Transacciones <span className="chip">({rows.length}) · toca el tipo para marcar vacaciones</span></div>
+        <input className="search" placeholder="Buscar comercio…" value={q} onChange={e=>setQ(e.target.value)}/>
+        <select className="filt" value={fAcc} onChange={e=>setFAcc(e.target.value)}><option value="todas">Todas las cuentas</option>{Object.entries(ACC).map(([k,v])=><option key={k} value={k}>{v.s}</option>)}</select>
+        <select className="filt" value={fCat} onChange={e=>setFCat(e.target.value)}><option value="todas">Todas las categorías</option>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+        <label className="chip" style={{display:"flex",gap:5,alignItems:"center"}}><input type="checkbox" checked={showExcl} onChange={e=>setShowExcl(e.target.checked)}/> ver pagos/traspasos</label>
+        <button className="btnx" onClick={exportOvr}>Exportar cambios</button>
+      </div>
+      {mobile ? (
+      <div style={{overflow:"auto",maxHeight:520}}>
+        {rows.map(t=>{const edited=ovr[t.id]&&ovr[t.id]!==t.cat;const bk=t.excl?null:bucketOf(t);return(
+          <div key={t.id} className={"txcard"+(t.excl?" excl":"")+(bk==="vac"?" vac":"")}>
+            <div className="r1">
+              <span className="num">{fdate(t.fecha)}</span>
+              <span className="tag" style={{background:ACC[t.cuenta].c+"18",color:ACC[t.cuenta].c}}>{ACC[t.cuenta].s}</span>
+              {t.cuota&&<span className="chip">cuota {t.cuota.n}/{t.cuota.de}</span>}
+              <span className="amt num" style={{color:t.flow==="in"?"var(--save)":(t.excl?"#AEB3C0":"var(--ink)")}}>{t.flow==="in"?"+":"−"}{clp(t.monto)}</span>
+            </div>
+            <div className="mer">{t.comercio}{t.ciudad&&<span className="chip"> · {t.ciudad}</span>}{t.moneda==="USD-bill"&&<span className="chip num"> · {usd(t.monto_orig)}</span>}</div>
+            <div className="r3">
+              <select className={"cat"+(edited?" edited":"")} value={catOf(t)} onChange={e=>setCat(t.id,e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+              {bk && <span className="bk" onClick={()=>toggleVac(t.id)} style={{background:BK[bk].c+"1c",color:BK[bk].c,borderColor:BK[bk].c+"55"}}>{BK[bk].l}</span>}
+            </div>
+          </div>)})}
+      </div>
+      ) : (
+      <div style={{overflow:"auto",maxHeight:500}}>
+      <table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Comercio</th><th>Categoría</th><th>Tipo</th><th className="rt">Monto</th></tr></thead>
+        <tbody>
+        {rows.map(t=>{const edited=ovr[t.id]&&ovr[t.id]!==t.cat;const bk=t.excl?null:bucketOf(t);return(
+          <tr key={t.id} className={t.excl?"excl":(bk==="vac"?"vac":"")}>
+            <td className="num">{fdate(t.fecha)}</td>
+            <td><span className="tag" style={{background:ACC[t.cuenta].c+"18",color:ACC[t.cuenta].c}}>{ACC[t.cuenta].s}</span></td>
+            <td>{t.comercio}{t.ciudad&&<span className="chip"> · {t.ciudad}</span>}{t.cuota&&<span className="chip"> · cuota {t.cuota.n}/{t.cuota.de}</span>}</td>
+            <td><select className={"cat"+(edited?" edited":"")} value={catOf(t)} onChange={e=>setCat(t.id,e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select></td>
+            <td>{bk && <span className="bk" onClick={()=>toggleVac(t.id)} style={{background:BK[bk].c+"1c",color:BK[bk].c,borderColor:BK[bk].c+"55"}}>{BK[bk].l}</span>}</td>
+            <td className="rt num" style={{color:t.flow==="in"?"var(--save)":(t.excl?"#AEB3C0":"var(--ink)")}}>{t.flow==="in"?"+":"−"}{clp(t.monto)}{t.moneda==="USD-bill"&&<div className="chip num">{usd(t.monto_orig)}</div>}</td>
+          </tr>)})}
+        </tbody></table>
+      </div>
+      )}
+    </div>
+    </>}
+
+    {tab==="fijos" && <>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"12px 0 0"}}>
+      <span className="chip">Ciclo {cycleLabel(ciclo)}{ciclo===CICLO_HOY?" · en curso":""} · lista: {fuenteFijos}</span>
+    </div>
+    <div className="cuoSum" style={{marginTop:10}}>
+      <div><div className="k">Esperado del mes</div><div className="num" style={{fontSize:19,fontWeight:700}}>{clp(totEsp)}</div></div>
+      <div><div className="k">Pagado</div><div className="num" style={{fontSize:19,fontWeight:700,color:"var(--save)"}}>{clp(totPag)}</div></div>
+      <div><div className="k">Pendiente</div><div className="num" style={{fontSize:19,fontWeight:700,color:totPend>0?"#E08A3C":"var(--muted)"}}>{clp(totPend)}</div></div>
+    </div>
+    <div className="panel" style={{marginTop:12,padding:"4px 14px"}}>
+      {fijosView.map(f=>(
+      <div key={f.nombre} className="fijorow">
+        <input type="checkbox" checked={f.pagado} disabled={!!f.tx} onChange={()=>toggleFijo(f.nombre)}/>
+        <div className="fi">
+          <div className="nm">{f.nombre} <span className="chip">{f.categoria} · día {f.dia}</span></div>
+          <div className="chip">{f.tx?("pagado el "+fdate(f.tx.fecha)+" — "+f.tx.comercio):(f.manual?"marcado manualmente":(f.atrasado?"⚠ atrasado — se esperaba el "+fdate(f.fEsp):"esperado el "+fdate(f.fEsp)))}</div>
+        </div>
+        <div className="rt">
+          <div className="num" style={{fontWeight:700,color:f.pagado?"var(--save)":(f.atrasado?"#E08A3C":"var(--ink)")}}>{clp(f.montoReal)}</div>
+          {f.tx&&f.tx.monto!==f.monto&&<div className="chip num">esperado {clp(f.monto)}</div>}
+        </div>
+      </div>))}
+    </div>
+    <div className="chip" style={{marginTop:10,lineHeight:1.6}}>
+      El ✓ es automático al detectar el cargo del ciclo (por patrón de comercio); usa el checkbox para pagos hechos por fuera.
+      La lista maestra se edita en tu Google Sheet (columnas: nombre, categoria, monto, dia, patron, activo).
+    </div>
+    </>}
+
+    {tab==="cuotas" && <>
+    <div className="cuoSum" style={{marginTop:14}}>
+      <div><div className="k">Compromiso pendiente</div><div className="num" style={{fontSize:19,fontWeight:700,color:COL.cuota}}>{clp(cuotasView.totPend)}</div></div>
+      <div><div className="k">Carga mensual actual</div><div className="num" style={{fontSize:19,fontWeight:700}}>{clp(cuotasView.carga)}</div></div>
+      <div><div className="k">Todo pagado en</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:4}}>{cuotasView.fin?mesNom(cuotasView.fin):"—"}</div></div>
+    </div>
+    <div className="panel" style={{marginTop:12,padding:"6px 14px"}}>
+      {cuotasView.items.map(t=>(
+      <div key={t.id} className="fijorow">
+        <div className="fi">
+          <div className="nm">{t.comercio} <span className="chip">cuota {t.nAct}/{t.cuota.de}{t.estimado?" (est.)":""}</span></div>
+          <div className="bar" style={{margin:"6px 0 4px"}}><i style={{width:(t.nAct/t.cuota.de*100)+"%",background:t.activa?COL.cuota:"#C7CCD8"}}/></div>
+          <div className="chip num">{clp(t.cuota.valor)}/mes · total {clp(t.cuota.total)}</div>
+        </div>
+        <div className="rt">
+          {t.activa ? <>
+            <div className="num" style={{fontWeight:700,color:COL.cuota}}>{clp(t.pend)}</div>
+            <div className="chip">última: <b>{mesNom(t.ultimo)}</b></div>
+          </> : <div className="chip" style={{color:"var(--save)",fontWeight:700}}>✓ pagada</div>}
+        </div>
+      </div>))}
+    </div>
+    <div className="panel" style={{marginTop:12,padding:"14px 16px"}}>
+      <div className="sectitle">Proyección de carga por ciclo</div>
+      <div style={{display:"flex",flexDirection:"column",gap:7,marginTop:10}}>
+        {cuotasView.proy.map(p=>(<div key={p.c} style={{display:"flex",alignItems:"center",gap:10}}>
+          <span className="chip" style={{width:70,flex:"none"}}>{mesNom(p.c)}</span>
+          <div className="bar" style={{flex:1}}><i style={{width:(p.monto/Math.max(cuotasView.carga,1)*100)+"%",background:COL.cuota}}/></div>
+          <span className="num" style={{fontSize:12,width:88,textAlign:"right",flex:"none"}}>{clp(p.monto)}</span></div>))}
+      </div>
+      {cuotasView.items.some(t=>t.estimado)&&<div className="chip" style={{marginTop:10}}>(est.): cuota avanzada automáticamente desde el último estado de cuenta conciliado; se confirma al conciliar los estados pendientes.</div>}
+    </div>
+    </>}
+
+    {tab==="meses" && <>
+    <div className="grid2" style={{marginTop:14}}>
+      <div className="panel" style={{padding:"16px 18px"}}>
+        <div className="sectitle">A pagar en tarjetas por mes</div>
+        <div style={{width:"100%",height:240,marginTop:10}}>
+          <ResponsiveContainer><BarChart data={chartMeses} margin={{top:6,right:8,left:0,bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F7" vertical={false}/>
+            <XAxis dataKey="mes" tick={{fontSize:12,fill:"#8A90A0"}} axisLine={false} tickLine={false}/>
+            <YAxis tickFormatter={clpK} tick={{fontSize:11,fill:"#8A90A0"}} axisLine={false} tickLine={false} width={46}/>
+            <Tooltip formatter={v=>clp(v)} labelStyle={{fontWeight:700}}/>
+            <Legend wrapperStyle={{fontSize:12}}/>
+            <Bar dataKey="Banco de Chile" stackId="a" fill="#3460E0"/>
+            <Bar dataKey="Santander" stackId="a" fill="#EC1C3D" radius={[4,4,0,0]}/>
+          </BarChart></ResponsiveContainer>
+        </div>
+      </div>
+      <div className="panel" style={{padding:"16px 18px"}}>
+        <div className="sectitle">Ahorro por mes</div>
+        <div style={{width:"100%",height:240,marginTop:10}}>
+          <ResponsiveContainer><BarChart data={chartAhorro} margin={{top:6,right:8,left:0,bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F7" vertical={false}/>
+            <XAxis dataKey="mes" tick={{fontSize:12,fill:"#8A90A0"}} axisLine={false} tickLine={false}/>
+            <YAxis tickFormatter={clpK} tick={{fontSize:11,fill:"#8A90A0"}} axisLine={false} tickLine={false} width={46}/>
+            <Tooltip formatter={v=>clp(v)} labelStyle={{fontWeight:700}}/>
+            <Legend wrapperStyle={{fontSize:12}}/>
+            <Bar dataKey="Ahorro" stackId="a" fill="#27B07A"/>
+            <Bar dataKey="Extra MetLife" stackId="a" fill="#9BC85A" radius={[4,4,0,0]}/>
+          </BarChart></ResponsiveContainer>
+        </div>
+        <div className="chip">Acumulado ene–may: ahorro explícito <b className="num">{clp(totAhorro)}</b> + extra MetLife <b className="num">{clp(totAhorroX)}</b>.</div>
+      </div>
+    </div>
+
+    <div className="panel" style={{marginTop:13,padding:"14px 16px 6px",overflow:"auto"}}>
+      <div className="sectitle" style={{marginBottom:6}}>Balances principales por mes</div>
+      <table className="mtab"><thead><tr>
+        <th>Mes 2026</th><th className="rt">TC BdC</th><th className="rt">TC Santander</th><th className="rt">Total tarjetas</th>
+        <th className="rt">Saldo Stg CC</th><th className="rt">Saldo BdC CC</th>
+        <th className="rt">Ahorro</th><th className="rt">Extra MetLife</th>
+      </tr></thead><tbody>
+        {MESES.map(x=>(<tr key={x.mes}>
+          <td style={{fontWeight:600}}>{x.mes}</td>
+          <td className="n">{clp(x.bdcTC)}{x.intl&&<span className="chip num"> +{usd(x.intl)}</span>}</td>
+          <td className="n">{clp(x.stgTC)}</td>
+          <td className="n" style={{fontWeight:700}}>{clp(x.bdcTC+x.stgTC)}</td>
+          <td className="n">{x.sStg!=null?clp(x.sStg):"—"}</td>
+          <td className="n">{clp(x.sChl)}</td>
+          <td className="n" style={{color:x.ahorro?COL.save:"inherit",fontWeight:x.ahorro?600:400}}>{x.ahorro?clp(x.ahorro):"—"}</td>
+          <td className="n" style={{color:"#5E8A2E"}}>{clp(x.ahorroX)}</td>
+        </tr>))}
+      </tbody></table>
+    </div>
+    <div className="chip" style={{marginTop:12,lineHeight:1.6}}>
+      Series desde los estados facturados (TC) y las cartolas (cuentas corrientes) de cada mes, conciliadas con sus totales de control.
+      "Ahorro" son traspasos explícitos a cuenta de ahorro / fondo mutuo; "Extra MetLife" es el 50% del seguro que también acumula.
+      Mayo es atípico por el viaje (financiado con ahorro). El saldo de BdC (~$22M) es el fondo a invertir y no se toca.
+    </div>
+    </>}
+
+   </div>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+<script>
+// PWA: solo aplica si se sirve por HTTPS (en file:// se ignora sin error)
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(function(){});
+}
+</script>
+</body>
+</html>
