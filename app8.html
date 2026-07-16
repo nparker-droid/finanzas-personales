@@ -169,28 +169,40 @@ const MESN=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","d
 const cycleLabel = c => { const [y,m]=c.split("-").map(Number); let pm=m-1,py=y; if(pm<1){pm=12;py--;} return "21 "+MESN[pm-1]+(py!==y?" "+py:"")+" – 20 "+MESN[m-1]+" "+y; };
 const cycleAdd=(c,k)=>{let [y,m]=c.split("-").map(Number); m+=k; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return y+"-"+pp(m);};
 const cycleDiff=(a,b)=>{const [ya,ma]=a.split("-").map(Number),[yb,mb]=b.split("-").map(Number); return (ya-yb)*12+(ma-mb);};
+const cycStart=c=>{const [y,m]=c.split("-").map(Number); let pm=m-1,py=y; if(pm<1){pm=12;py--;} return py+"-"+pp(pm)+"-21";};
 const mesNom=c=>{const [y,m]=c.split("-").map(Number); return MESN[m-1]+" "+y;};
 const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malformadas
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-07-16 v11";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-07-16 v14";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
 const FIJOS_CSV_URL = "https://docs.google.com/spreadsheets/d/1NyFBoli9AivCwq70tW8Bxg3-ACYomfg5T5GXr68R8QM/gviz/tq?tqx=out:csv";
 const FIJOS_DEF = [
- {nombre:"MetLife Seguros", categoria:"Seguros", monto:121485, dia:12, patron:"metlife", activo:true},
- {nombre:"PAC Seguro Auto", categoria:"Seguros", monto:30280, dia:6, patron:"seguro auto", activo:true},
- {nombre:"CAE", categoria:"CAE/Crédito", monto:114127, dia:2, patron:"cae", activo:true},
- {nombre:"YouTube Premium", categoria:"Suscripciones", monto:11000, dia:1, patron:"youtube", activo:true},
- {nombre:"Google Play YouTube", categoria:"Suscripciones", monto:2690, dia:4, patron:"google play", activo:true},
- {nombre:"Prime Video", categoria:"Suscripciones", monto:6490, dia:29, patron:"prime video", activo:true},
- {nombre:"Microsoft 365", categoria:"Suscripciones", monto:1990, dia:14, patron:"microsoft", activo:true},
- {nombre:"Patreon", categoria:"Suscripciones", monto:5452, dia:12, patron:"patreon", activo:true},
- {nombre:"ChatGPT", categoria:"Suscripciones", monto:21682, dia:14, patron:"openai", activo:true},
- {nombre:"Comisión TC BdC", categoria:"Comisiones e impuestos", monto:4851, dia:20, patron:"comisi", activo:true},
+ {nombre:"MetLife Seguros", categoria:"Seguros", monto:121485, dia:12, patron:"metlife", activo:true, cuenta:"STG-TC"},
+ {nombre:"PAC Seguro Auto", categoria:"Seguros", monto:30280, dia:6, patron:"seguro auto", activo:true, cuenta:"STG-CC"},
+ {nombre:"CAE", categoria:"CAE/Crédito", monto:114127, dia:2, patron:"cae", activo:true, cuenta:"STG-CC"},
+ {nombre:"YouTube Premium", categoria:"Suscripciones", monto:11000, dia:1, patron:"youtube", activo:true, cuenta:"STG-TC"},
+ {nombre:"Google Play YouTube", categoria:"Suscripciones", monto:2690, dia:4, patron:"google play", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Prime Video", categoria:"Suscripciones", monto:6490, dia:29, patron:"prime video", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Microsoft 365", categoria:"Suscripciones", monto:1990, dia:14, patron:"microsoft", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Patreon", categoria:"Suscripciones", monto:5452, dia:12, patron:"patreon", activo:true, cuenta:"STG-TC"},
+ {nombre:"ChatGPT", categoria:"Suscripciones", monto:21682, dia:14, patron:"openai", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Comisión TC BdC", categoria:"Comisiones e impuestos", monto:4851, dia:20, patron:"comisi", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Smart Fit Plan", categoria:"Suscripciones", monto:29900, dia:15, patron:"smart fit", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Smart Fit Adicional", categoria:"Suscripciones", monto:17450, dia:15, patron:"smart fit", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Donaciones FALP", categoria:"Donaciones", monto:7000, dia:15, patron:"falp", activo:true, cuenta:"CHL-TC"},
+ {nombre:"Anthropic Claude", categoria:"Suscripciones", monto:23100, dia:10, patron:"anthropic", activo:true, cuenta:"CHL-TC-INT"},
 ];
+// normaliza el valor de la columna cuenta/tarjeta de la sheet a una clave de ACC
+const accNorm=s=>{s=(s||"").trim().toUpperCase(); if(!s) return "";
+  if(ACC[s]) return s;
+  const cc=/CC|CTA|CORRIENTE/.test(s);
+  if(/SANT|STG/.test(s)) return cc?"STG-CC":"STG-TC";
+  if(/CHL|BDC|CHILE|^BC$/.test(s)) return cc?"CHL-CC":"CHL-TC";
+  return "";};
 const parseFijosCSV = txt => {
   const out=[];let row=[],cur="",q=false;
   for(let i=0;i<txt.length;i++){const c=txt[i];
@@ -209,6 +221,8 @@ const parseFijosCSV = txt => {
     monto:Number(g(r,"monto").replace(/[^0-9\-]/g,""))||0,
     dia:Number(g(r,"dia"))||1, patron:(g(r,"patron")||g(r,"nombre")).toLowerCase(),
     activo:!["false","0","no"].includes(g(r,"activo").toLowerCase()),
+    // columna "cuenta" (o "tarjeta") de la sheet; si no existe, hereda de la lista embebida por nombre
+    cuenta:accNorm(g(r,"cuenta")||g(r,"tarjeta"))||((FIJOS_DEF.find(d=>d.nombre.toLowerCase()===g(r,"nombre").trim().toLowerCase())||{}).cuenta||""),
   }));
 };
 // fecha esperada de un fijo dentro de un ciclo (ciclo c termina el 20 del mes m)
@@ -360,6 +374,7 @@ function App(){
   const [vac,setVac]=useState(null);
   const [ready,setReady]=useState(false);
   const [meta,setMeta]=useState(700000);
+  const [sueldo,setSueldo]=useState(1870000);
   const [fAcc,setFAcc]=useState("todas");
   const [fCat,setFCat]=useState("todas");
   const [q,setQ]=useState("");
@@ -381,6 +396,7 @@ function App(){
       for(const k of await store.list("cat:")){const g=await store.get(k);if(g!=null)o[k.slice(4)]=g;}
       for(const k of await store.list("vac:")){const g=await store.get(k);if(g!=null)v[k.slice(4)]=g==="1";}
       const mg=parseInt(await store.get("meta")); if(!isNaN(mg)&&mg>0)setMeta(mg);
+      const sg=parseInt(await store.get("sueldo")); if(!isNaN(sg)&&sg>0)setSueldo(sg);
       const fc={}; for(const k of await store.list("fijo:")){const g=await store.get(k);if(g==="1")fc[k.slice(5)]=true;}
       setFijoChk(fc);
     }catch(e){}
@@ -416,6 +432,7 @@ function App(){
   const setCat=(id,c)=>{ setOvr(p=>({...p,[id]:c})); store.set("cat:"+id,c); };
   const toggleVac=(id)=>{ setVac(p=>{const nv={...p,[id]:!p[id]}; store.set("vac:"+id,nv[id]?"1":"0"); return nv;}); setVacKeys(p=>new Set(p).add(id)); };
   const saveMeta=(x)=>{ setMeta(x); store.set("meta",String(x)); };
+  const saveSueldo=(x)=>{ setSueldo(x); store.set("sueldo",String(x)); };
   const exportOvr=async()=>{
     const v={}; vacKeys.forEach(id=>{ if(vac&&(id in vac)) v[id]=vac[id]; });
     const payload=JSON.stringify({meta,cat:ovr,vac:v},null,1);
@@ -476,15 +493,22 @@ function App(){
 
   const toggleFijo=(nombre)=>{ const key=ciclo+"|"+nombre;
     setFijoChk(p=>{const np={...p,[key]:!p[key]}; store.set("fijo:"+key,np[key]?"1":"0"); return np;}); };
-  const fijosView=useMemo(()=>fijos.filter(f=>f.activo).map(f=>{
-    const pat=(f.patron||f.nombre).toLowerCase();
-    const tx=rows0.find(t=>cycleTx(t)===ciclo&&t.flow==="out"&&!t.excl&&t.comercio.toLowerCase().includes(pat));
-    const manual=!!fijoChk[ciclo+"|"+f.nombre];
-    const pagado=!!tx||manual;
-    const fEsp=fechaEsp(ciclo,f.dia);
-    const atrasado=!pagado&&ciclo===CICLO_HOY&&fEsp<HOY;
-    return {...f,tx,manual,pagado,atrasado,fEsp,montoReal:tx?tx.monto:f.monto};
-  }).sort((a,b)=>a.fEsp<b.fEsp?-1:1),[fijos,rows0,ciclo,fijoChk]);
+  const fijosView=useMemo(()=>{
+    const used=new Set();
+    return fijos.filter(f=>f.activo).map(f=>{
+      const pat=(f.patron||f.nombre).toLowerCase();
+      // candidatos del ciclo por patrón; si varios fijos comparten patrón (ej. Smart Fit x2),
+      // se asigna el cargo de monto más cercano al esperado, sin reutilizar transacciones
+      const tx=rows0.filter(t=>cycleTx(t)===ciclo&&t.flow==="out"&&!t.excl&&!used.has(t.id)&&t.comercio.toLowerCase().includes(pat))
+        .sort((a,b)=>Math.abs(a.monto-f.monto)-Math.abs(b.monto-f.monto))[0];
+      if(tx) used.add(tx.id);
+      const manual=!!fijoChk[ciclo+"|"+f.nombre];
+      const pagado=!!tx||manual;
+      const fEsp=fechaEsp(ciclo,f.dia);
+      const atrasado=!pagado&&ciclo===CICLO_HOY&&fEsp<HOY;
+      return {...f,tx,manual,pagado,atrasado,fEsp,montoReal:tx?tx.monto:f.monto};
+    }).sort((a,b)=>a.fEsp<b.fEsp?-1:1);
+  },[fijos,rows0,ciclo,fijoChk]);
 
   // cuotas proyectadas: avanza n desde el último estado conciliado hasta el ciclo actual
   const cuotasView=useMemo(()=>{
@@ -523,6 +547,12 @@ function App(){
   const totEsp=fijosView.reduce((a,f)=>a+f.monto,0);
   const totPag=fijosView.filter(f=>f.pagado).reduce((a,f)=>a+f.montoReal,0);
   const totPend=fijosView.filter(f=>!f.pagado).reduce((a,f)=>a+f.monto,0);
+  // Base del ciclo (sin esperar facturación): fijos esperados (lista maestra + extras ya cargados) y cuotas proyectadas
+  const fijoMatched=fijosView.reduce((a,f)=>a+(f.tx?f.montoReal:0),0);
+  const fijoProj=ciclo===CICLO_HOY?totEsp+Math.max(0,m.fijo-fijoMatched):m.fijo;
+  const dproj=cycleDiff(ciclo,CICLO_HOY);
+  const cuotaProj=dproj>=0?((cuotasView.proy[dproj]||{monto:0}).monto):m.cuota;
+  const espByAcc=fijosView.reduce((o,f)=>{const k=ACC[f.cuenta]?f.cuenta:"—";o[k]=(o[k]||0)+f.monto;return o;},{});
 
   return (<div className="wrap">
    <style>{CSS}</style>
@@ -560,14 +590,14 @@ function App(){
         </div>
       </div>
       <div className="card" style={{background:COL.fijo+"10",borderColor:COL.fijo+"33"}}>
-        <div className="lbl">Gastos fijos mes</div>
-        <div className="big num" style={{color:COL.fijo}}>{clp(m.fijo)}</div>
-        <div className="sub">suscripciones, seguros, CAE, comisiones y lista maestra</div>
+        <div className="lbl">Gastos fijos mes {ciclo===CICLO_HOY&&<span className="chip">(base esperada)</span>}</div>
+        <div className="big num" style={{color:COL.fijo}}>{clp(fijoProj)}</div>
+        <div className="sub">{ciclo===CICLO_HOY?<>cargado {clp(m.fijo)} · pendiente {clp(Math.max(0,fijoProj-m.fijo))}</>:<>suscripciones, seguros, CAE, comisiones y lista maestra</>}</div>
       </div>
       <div className="card" style={{background:COL.cuota+"10",borderColor:COL.cuota+"33"}}>
-        <div className="lbl">Cuotas mes</div>
-        <div className="big num" style={{color:COL.cuota}}>{clp(m.cuota)}</div>
-        <div className="sub">todas las cuotas del ciclo · detalle en pestaña Cuotas</div>
+        <div className="lbl">Cuotas mes {ciclo===CICLO_HOY&&<span className="chip">(proyectado)</span>}</div>
+        <div className="big num" style={{color:COL.cuota}}>{clp(cuotaProj)}</div>
+        <div className="sub">{ciclo===CICLO_HOY?<>cargado a la fecha {clp(m.cuota)} · detalle en pestaña Cuotas</>:<>todas las cuotas del ciclo · detalle en pestaña Cuotas</>}</div>
       </div>
       <div className="card">
         <div className="lbl">A pagar próxima facturación</div>
@@ -590,6 +620,36 @@ function App(){
       </div>
       {m.vacN>0 && <div className="aside">✈ Gasto extraordinario marcado como vacaciones: <b className="num">{clp(m.vacN)}</b> — financiado con ahorro, no incluido arriba (aplica solo a meses atípicos).</div>}
     </div>
+
+    {ciclo===CICLO_HOY&&(()=>{
+      const ini=cycStart(ciclo);
+      const dTot=Math.round((new Date(ciclo+"-20")-new Date(ini))/864e5)+1;
+      const dTr=Math.max(1,Math.min(dTot,Math.round((new Date(HOY)-new Date(ini))/864e5)+1));
+      const consProj=Math.round(m.consN*dTot/dTr);
+      const totHoy=m.consN+m.fijo+m.cuota;
+      const totProj=consProj+fijoProj+cuotaProj;
+      const delta=sueldo-totProj;
+      return(
+      <div className="panel" style={{marginTop:13,padding:"15px 18px"}}>
+        <div className="sectitle">Proyección fin de ciclo <span className="chip">día {dTr} de {dTot} · consumo a ritmo actual · fijos y cuotas según base</span></div>
+        <div style={{overflow:"auto",marginTop:10}}>
+        <table className="mtab" style={{minWidth:420}}>
+          <thead><tr><th>Concepto</th><th className="rt">A la fecha</th><th className="rt">Proyección cierre</th></tr></thead>
+          <tbody>
+            <tr><td>Consumo variable</td><td className="n">{clp(m.consN)}</td><td className="n">{clp(consProj)}</td></tr>
+            <tr><td>Gastos fijos <span className="chip">(base esperada)</span></td><td className="n">{clp(m.fijo)}</td><td className="n">{clp(fijoProj)}</td></tr>
+            <tr><td>Cuotas <span className="chip">(base proyectada)</span></td><td className="n">{clp(m.cuota)}</td><td className="n">{clp(cuotaProj)}</td></tr>
+            <tr><td style={{fontWeight:700}}>Total ciclo</td><td className="n" style={{fontWeight:700}}>{clp(totHoy)}</td><td className="n" style={{fontWeight:700}}>{clp(totProj)}</td></tr>
+          </tbody>
+        </table></div>
+        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center",marginTop:12}}>
+          <span className="chip">Sueldo</span>
+          <span className="editbox"><span style={{color:"var(--muted)"}}>$</span><input className="num" type="number" step="10000" value={sueldo} onChange={e=>saveSueldo(Math.max(0,parseInt(e.target.value||"0")))}/></span>
+          <span className="chip">→ delta proyectado a fin de ciclo:</span>
+          <b className="num" style={{fontSize:16,color:delta>=0?"var(--save)":COL.cons}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</b>
+        </div>
+        {diasSin>2&&<div className="aside">⚠ Proyección con datos al {fdate(dataMax)} — el ritmo de consumo puede estar subestimado.</div>}
+      </div>);})()}
 
     <div className="saverow">
       <div className="savecard" style={{background:COL.save+"12",border:"1px solid "+COL.save+"33"}}>
@@ -707,13 +767,16 @@ function App(){
       <div><div className="k">Esperado del mes</div><div className="num" style={{fontSize:19,fontWeight:700}}>{clp(totEsp)}</div></div>
       <div><div className="k">Pagado</div><div className="num" style={{fontSize:19,fontWeight:700,color:"var(--save)"}}>{clp(totPag)}</div></div>
       <div><div className="k">Pendiente</div><div className="num" style={{fontSize:19,fontWeight:700,color:totPend>0?"#E08A3C":"var(--muted)"}}>{clp(totPend)}</div></div>
+      {["STG-TC","STG-CC","CHL-TC","CHL-TC-INT","CHL-CC"].filter(k=>espByAcc[k]).map(k=>(
+        <div key={k}><div className="k" style={{color:ACC[k].c}}>{({"STG-TC":"Santander TC","STG-CC":"Santander CC","CHL-TC":"BdC TC","CHL-TC-INT":"BdC TC Int.","CHL-CC":"BdC CC"})[k]}</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:3}}>{clp(espByAcc[k])}</div></div>))}
+      {espByAcc["—"]>0&&<div><div className="k">Sin cuenta asignada</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:3,color:"var(--muted)"}}>{clp(espByAcc["—"])}</div></div>}
     </div>
     <div className="panel" style={{marginTop:12,padding:"4px 14px"}}>
       {fijosView.map(f=>(
       <div key={f.nombre} className="fijorow">
         <input type="checkbox" checked={f.pagado} disabled={!!f.tx} onChange={()=>toggleFijo(f.nombre)}/>
         <div className="fi">
-          <div className="nm">{f.nombre} <span className="chip">{f.categoria} · día {f.dia}</span></div>
+          <div className="nm">{f.nombre} {f.cuenta&&ACC[f.cuenta]&&<span className="tag" style={{background:ACC[f.cuenta].c+"18",color:ACC[f.cuenta].c}}>{ACC[f.cuenta].s}</span>} <span className="chip">{f.categoria} · día {f.dia}</span></div>
           <div className="chip">{f.tx?("pagado el "+fdate(f.tx.fecha)+" — "+f.tx.comercio):(f.manual?"marcado manualmente":(f.atrasado?"⚠ atrasado — se esperaba el "+fdate(f.fEsp):"esperado el "+fdate(f.fEsp)))}</div>
         </div>
         <div className="rt">
@@ -724,7 +787,8 @@ function App(){
     </div>
     <div className="chip" style={{marginTop:10,lineHeight:1.6}}>
       El ✓ es automático al detectar el cargo del ciclo (por patrón de comercio); usa el checkbox para pagos hechos por fuera.
-      La lista maestra se edita en tu Google Sheet (columnas: nombre, categoria, monto, dia, patron, activo).
+      La lista maestra se edita en tu Google Sheet (columnas: nombre, categoria, monto, dia, patron, activo, cuenta).
+      La columna "cuenta" acepta STG-TC, STG-CC, CHL-TC, CHL-CC (o "Santander"/"BC"); si falta, se hereda de la lista embebida por nombre.
     </div>
     </>}
 
