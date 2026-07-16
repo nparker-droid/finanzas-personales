@@ -150,6 +150,8 @@ const METLIFE_RE = /metlife/i;
 const RESERVA_CHL = 21974266;
 const PAL = ["#F2724B","#3460E0","#28BFA3","#F2B33D","#9B6BE6","#46AEE0","#EC5C7D","#7BBF4A","#E08A3C","#6C7A99","#C7CCD8"];
 const COL = {cons:"#F2724B", fijo:"#6271E6", cuota:"#28BFA3", save:"#27B07A", saveX:"#7BBF4A"};
+// color fijo para las categorías agregadas del donut; el resto rota la paleta
+const donutColor=(n,i)=>n==="Cuotas mes"?COL.cuota:n==="Gastos fijos mes"?COL.fijo:PAL[i%PAL.length];
 
 const MESES = [
  {mes:"Ene", bdcTC:897404,  stgTC:150282, sStg:1794208, sChl:22003702, ahorro:600000, metlife:120071, cae:113823},
@@ -172,7 +174,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-07-12 v8";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-07-16 v11";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -362,13 +364,14 @@ function App(){
   const [fCat,setFCat]=useState("todas");
   const [q,setQ]=useState("");
   const [showExcl,setShowExcl]=useState(false);
-  const [ciclo,setCiclo]=useState(CICLOS.includes(CICLO_HOY)?CICLO_HOY:CICLOS[0]);
+  const [ciclo,setCiclo]=useState(CICLOS.includes(CICLO_HOY)?CICLO_HOY:(CICLOS[0]||CICLO_HOY));
   const [vacKeys,setVacKeys]=useState(new Set());
   const [rows0,setRows0]=useState(DATA_C);
   const [fuente,setFuente]=useState(REMOTE_URL?"cargando remota…":"embebida");
   const [fijos,setFijos]=useState(FIJOS_DEF);
   const [fuenteFijos,setFuenteFijos]=useState(FIJOS_CSV_URL?"cargando…":"lista embebida");
   const [fijoChk,setFijoChk]=useState({});
+  const [soloVar,setSoloVar]=useState(false);
   const vacStored=useRef({});
   const mobile=useMobile();
 
@@ -420,7 +423,11 @@ function App(){
     catch(e){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([payload],{type:"application/json"})); a.download="overrides_finanzas.json"; a.click(); }
   };
   const catOf=t=>ovr[t.id]||t.cat;
-  const bucketOf=t=>{ if(!vac) return "fijo"; if(vac[t.id]) return "vac"; if(t.cuota) return "cuota"; return FIJO.has(catOf(t))?"fijo":"cons"; };
+  // ¿gasto fijo? por categoría fija o por patrón de la lista maestra de fijos
+  const esFijoTx=t=>FIJO.has(catOf(t))||fijos.some(f=>f.activo&&t.comercio.toLowerCase().includes((f.patron||f.nombre).toLowerCase()));
+  // Buckets: "cons" = compras particulares del ciclo (sin cuotas ni fijos);
+  // "cuota" = toda cuota facturada, incluso 1/N (detalle en pestaña Cuotas); "fijo" = fijos del ciclo (categoría o patrón)
+  const bucketOf=t=>{ if(!vac) return "fijo"; if(vac[t.id]) return "vac"; if(t.cuota) return "cuota"; return esFijoTx(t)?"fijo":"cons"; };
 
   const m=useMemo(()=>{
     if(!vac) return null;
@@ -431,8 +438,12 @@ function App(){
     const reembVac=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
     const reembCons=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&!REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
     const consN=cons-reembCons, vacN=vacb-reembVac;
+    // Categorías: el detalle solo aplica al consumo del mes; todas las cuotas
+    // y los gastos fijos se agrupan en las categorías agregadas "Cuotas mes" / "Gastos fijos mes"
     const byCat={};
-    out.filter(t=>bucketOf(t)!=="vac").forEach(t=>{const c=catOf(t);byCat[c]=(byCat[c]||0)+t.monto;});
+    out.forEach(t=>{const b=bucketOf(t); if(b==="vac") return;
+      const c=b==="cuota"?"Cuotas mes":b==="fijo"?"Gastos fijos mes":catOf(t);
+      byCat[c]=(byCat[c]||0)+t.monto;});
     Object.entries(REEMB_CAT).forEach(([id,c])=>{const t=rows0.find(x=>x.id===id);if(t&&inC(t))byCat[c]=(byCat[c]||0)-t.monto;});
     const cats=Object.entries(byCat).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
     let donut=cats.slice(0,8); const rest=cats.slice(8).reduce((a,[,v])=>a+v,0);
@@ -445,16 +456,20 @@ function App(){
     const compromiso=cuotas.reduce((a,t)=>a+t.cuota.pendiente,0);
     const met=rows0.find(t=>inC(t)&&METLIFE_RE.test(t.comercio)); const metX=met?Math.round(met.monto*0.5):0;
     return {consN,fijo,cuota,vacN,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,proxMes,compromiso,metX};
-  },[ovr,vac,ciclo,rows0]);
+  },[ovr,vac,ciclo,rows0,fijos]);
 
   const rows=useMemo(()=>rows0.filter(t=>{
     if(cycleTx(t)!==ciclo) return false;
+    if(soloVar&&(t.flow!=="out"||t.excl||bucketOf(t)!=="cons")) return false;
     if(!showExcl&&t.excl) return false;
     if(fAcc!=="todas"&&t.cuenta!==fAcc) return false;
     if(fCat!=="todas"&&catOf(t)!==fCat) return false;
     if(q&&!(t.comercio.toLowerCase().includes(q.toLowerCase())||(t.ciudad||"").toLowerCase().includes(q.toLowerCase()))) return false;
     return true;
-  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0]);
+  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0,soloVar,fijos,vac]);
+
+  // tripwire de duplicados: misma fecha+cuenta+monto+flow con id distinto
+  const dupCands=useMemo(()=>{const seen={};let n=0;rows0.forEach(t=>{const k=t.fecha+"|"+t.cuenta+"|"+t.monto+"|"+t.flow;if(seen[k])n++;else seen[k]=1;});return n;},[rows0]);
 
   const ciclosL=useMemo(()=>[...new Set(rows0.map(t=>cycleTx(t)))].sort().reverse(),[rows0]);
   useEffect(()=>{ if(ciclosL.length&&!ciclosL.includes(ciclo)) setCiclo(ciclosL.includes(CICLO_HOY)?CICLO_HOY:ciclosL[0]); },[ciclosL]);
@@ -536,7 +551,7 @@ function App(){
     </div>
     <div className="cardgrid" style={{marginTop:10}}>
       <div className="card" style={{background:COL.cons+"10",borderColor:COL.cons+"33"}}>
-        <div className="lbl">Consumo del mes <span className="chip">(variable)</span></div>
+        <div className="lbl">Consumo del mes <span className="chip">(sin cuotas ni fijos)</span></div>
         <div className="big num" style={{color:COL.cons}}>{clp(m.consN)}</div>
         <div className="sub">meta <span className="editbox"><span style={{color:"var(--muted)"}}>$</span>
           <input className="num" type="number" step="50000" value={meta} onChange={e=>saveMeta(Math.max(0,parseInt(e.target.value||"0")))}/></span>
@@ -545,14 +560,14 @@ function App(){
         </div>
       </div>
       <div className="card" style={{background:COL.fijo+"10",borderColor:COL.fijo+"33"}}>
-        <div className="lbl">Gastos fijos</div>
+        <div className="lbl">Gastos fijos mes</div>
         <div className="big num" style={{color:COL.fijo}}>{clp(m.fijo)}</div>
-        <div className="sub">suscripciones, seguros, CAE, comisiones</div>
+        <div className="sub">suscripciones, seguros, CAE, comisiones y lista maestra</div>
       </div>
       <div className="card" style={{background:COL.cuota+"10",borderColor:COL.cuota+"33"}}>
-        <div className="lbl">Cuotas del mes</div>
+        <div className="lbl">Cuotas mes</div>
         <div className="big num" style={{color:COL.cuota}}>{clp(m.cuota)}</div>
-        <div className="sub">obligación temporal · {m.cuotas.length} compras vigentes</div>
+        <div className="sub">todas las cuotas del ciclo · detalle en pestaña Cuotas</div>
       </div>
       <div className="card">
         <div className="lbl">A pagar próxima facturación</div>
@@ -570,8 +585,8 @@ function App(){
       </div>
       <div className="lg">
         <div className="it"><span className="dot" style={{background:COL.cons}}/>Consumo del mes <b className="num">{clp(m.consN)}</b></div>
-        <div className="it"><span className="dot" style={{background:COL.fijo}}/>Fijos <b className="num">{clp(m.fijo)}</b></div>
-        <div className="it"><span className="dot" style={{background:COL.cuota}}/>Cuotas <b className="num">{clp(m.cuota)}</b></div>
+        <div className="it"><span className="dot" style={{background:COL.fijo}}/>Gastos fijos mes <b className="num">{clp(m.fijo)}</b></div>
+        <div className="it"><span className="dot" style={{background:COL.cuota}}/>Cuotas mes <b className="num">{clp(m.cuota)}</b></div>
       </div>
       {m.vacN>0 && <div className="aside">✈ Gasto extraordinario marcado como vacaciones: <b className="num">{clp(m.vacN)}</b> — financiado con ahorro, no incluido arriba (aplica solo a meses atípicos).</div>}
     </div>
@@ -603,19 +618,19 @@ function App(){
 
     <div className="grid2">
       <div className="panel" style={{padding:"16px 18px"}}>
-        <div className="sectitle">Costo por categoría <span className="chip">sin vacaciones</span></div>
+        <div className="sectitle">Costo por categoría <span className="chip">consumo del mes en detalle · cuotas y fijos agrupados · sin vacaciones</span></div>
         <div className="donutrow">
           <div style={{width:160,height:160,position:"relative",flex:"none"}}>
             <ResponsiveContainer width="100%" height="100%"><PieChart>
               <Pie data={m.donut.map(([n,v])=>({name:n,value:v}))} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={76} stroke="none" paddingAngle={1}>
-                {m.donut.map((_,i)=><Cell key={i} fill={PAL[i%PAL.length]}/>)}
+                {m.donut.map(([n],i)=><Cell key={i} fill={donutColor(n,i)}/>)}
               </Pie></PieChart></ResponsiveContainer>
             <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
               <div className="chip">total</div><div className="num" style={{fontWeight:700,fontSize:12.5}}>{clp(totalDona)}</div></div>
           </div>
           <div className="legend" style={{flex:1}}>
             {m.donut.map(([n,v],i)=>(<div className="row" key={n}>
-              <span className="dot" style={{background:PAL[i%PAL.length]}}/><span className="nm">{n}</span>
+              <span className="dot" style={{background:donutColor(n,i)}}/><span className="nm">{n}</span>
               <span className="num" style={{color:"var(--muted)"}}>{clp(v)}</span>
               <span className="num chip" style={{width:36,textAlign:"right"}}>{Math.round(v/totalDona*100)}%</span></div>))}
           </div>
@@ -643,8 +658,10 @@ function App(){
         <input className="search" placeholder="Buscar comercio…" value={q} onChange={e=>setQ(e.target.value)}/>
         <select className="filt" value={fAcc} onChange={e=>setFAcc(e.target.value)}><option value="todas">Todas las cuentas</option>{Object.entries(ACC).map(([k,v])=><option key={k} value={k}>{v.s}</option>)}</select>
         <select className="filt" value={fCat} onChange={e=>setFCat(e.target.value)}><option value="todas">Todas las categorías</option>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+        <label className="chip" style={{display:"flex",gap:5,alignItems:"center"}}><input type="checkbox" checked={soloVar} onChange={e=>setSoloVar(e.target.checked)}/> <b>solo gasto variable</b> (sin fijos ni cuotas)</label>
         <label className="chip" style={{display:"flex",gap:5,alignItems:"center"}}><input type="checkbox" checked={showExcl} onChange={e=>setShowExcl(e.target.checked)}/> ver pagos/traspasos</label>
         <button className="btnx" onClick={exportOvr}>Exportar cambios</button>
+        {dupCands>0&&<span className="chip" style={{color:"#E08A3C",fontWeight:600}}>⚠ {dupCands} posibles duplicados (misma fecha/cuenta/monto) — revisar</span>}
       </div>
       {mobile ? (
       <div style={{overflow:"auto",maxHeight:520}}>
