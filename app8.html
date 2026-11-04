@@ -166,8 +166,9 @@ const fechaEsp=(c,dia)=>{const [y,m]=c.split("-").map(Number); let mm=m,yy=y; if
 // (ver apps_script_datos.txt). Vacía => la app usa solo los datos embebidos.
 const REMOTE_URL = "https://script.google.com/macros/s/AKfycbzHHGuSfrc72Api2UW6PUV8un82QzRyxp92TcOIRy7AESs0VnERx8k_q6dmZmDhTw0Bnw/exec";
 const inWin = f => VAC_WINDOWS.some(([a,b])=>f>=a&&f<=b);
-const heurVac = t => t.flow==="out"&&!t.excl&&inWin(t.fecha)&&t.cat!=="Suscripciones"
-  && (t.cuenta==="CHL-TC-INT" || !SGO.has(t.ciudad||""));
+// Filas con "viaje" (publicadas en notifs_*.json) cuentan como vacaciones sin depender de VAC_WINDOWS
+const heurVac = t => t.flow==="out"&&!t.excl&&(!!t.viaje || inWin(t.fecha)&&t.cat!=="Suscripciones"
+  && (t.cuenta==="CHL-TC-INT" || !SGO.has(t.ciudad||"")));
 
 const clp = n => new Intl.NumberFormat("es-CL",{style:"currency",currency:"CLP",maximumFractionDigits:0}).format(Math.round(n));
 const clpK = n => "$"+(n/1e6).toFixed(n>=1e6?1:2)+"M";
@@ -411,7 +412,8 @@ function App(){
     const compromiso=cuotas.reduce((a,t)=>a+t.cuota.pendiente,0);
     const met=rows0.find(t=>inC(t)&&METLIFE_RE.test(t.comercio)); const metX=met?Math.round(met.monto*0.5):0;
     const cuotaEsp=out.filter(t=>bucketOf(t)==="cuota"&&esEsp(t)).reduce((a,t)=>a+t.monto,0);
-    return {consN,fijo,cuota,cuotaEsp,vacN,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,proxMes,compromiso,metX};
+    const viajes=[...new Set(out.filter(t=>bucketOf(t)==="vac"&&t.viaje).map(t=>t.viaje))];
+    return {consN,fijo,cuota,cuotaEsp,vacN,viajes,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,proxMes,compromiso,metX};
   },[ovr,vac,ciclo,rows0,fijos]);
 
   const rows=useMemo(()=>rows0.filter(t=>{
@@ -568,7 +570,7 @@ function App(){
         <div className="it"><span className="dot" style={{background:COL.fijo}}/>Gastos fijos mes <b className="num">{clp(m.fijo)}</b></div>
         <div className="it"><span className="dot" style={{background:COL.cuota}}/>Cuotas mes <b className="num">{clp(m.cuota)}</b></div>
       </div>
-      {m.vacN>0 && <div className="aside">✈ Gasto extraordinario marcado como vacaciones: <b className="num">{clp(m.vacN)}</b> — financiado con ahorro, no incluido arriba (aplica solo a meses atípicos).</div>}
+      {m.vacN>0 && <div className="aside">✈ Gasto extraordinario marcado como vacaciones{m.viajes.length?" ("+m.viajes.map(v=>"viaje "+v).join(", ")+")":""}: <b className="num">{clp(m.vacN)}</b> — financiado con ahorro, no incluido arriba (aplica solo a meses atípicos).</div>}
     </div>
 
     {ciclo===CICLO_HOY&&(()=>{
