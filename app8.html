@@ -102,7 +102,12 @@ const MESES = [
 const SGO = new Set(["SANTIAGO","LAS CONDES","PROVIDENCIA","VITACURA",""]);
 const pp = x => String(x).padStart(2,"0");
 const cycleOf = f => { const [y,m,d]=f.split("-").map(Number); let cm=m,cy=y; if(d>=21){cm++; if(cm>12){cm=1;cy++;}} return cy+"-"+pp(cm); };
-const cycleTx = t => t.ciclo || cycleOf(t.fecha);
+// v21.1: cada tarjeta con su propio corte. BdC cierra el 20 (ciclo 21–20); Santander TC cierra el 28 (ciclo 29–28).
+// Ambos se nombran por el mes de cierre, así el ciclo "nov" de las dos tarjetas es lo que se paga el 30 de nov.
+const CORTE_STG=28, CORTE_BDC=20;
+const corteDe = cuenta => cuenta==="STG-TC"?CORTE_STG:CORTE_BDC;
+const cycleOfC = (f,corte) => { const [y,m,d]=f.split("-").map(Number); let cm=m,cy=y; if(d>corte){cm++; if(cm>12){cm=1;cy++;}} return cy+"-"+pp(cm); };
+const cycleTx = t => t.ciclo || cycleOfC(t.fecha, corteDe(t.cuenta));
 const MESN=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 const cycleLabel = c => { const [y,m]=c.split("-").map(Number); let pm=m-1,py=y; if(pm<1){pm=12;py--;} return "21 "+MESN[pm-1]+(py!==y?" "+py:"")+" – 20 "+MESN[m-1]+" "+y; };
 const cycleAdd=(c,k)=>{let [y,m]=c.split("-").map(Number); m+=k; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return y+"-"+pp(m);};
@@ -113,7 +118,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-11-04 v21";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-11-04 v21.1";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -164,7 +169,7 @@ const parseFijosCSV = txt => {
   }));
 };
 // fecha esperada de un fijo dentro de un ciclo (ciclo c termina el 20 del mes m)
-const fechaEsp=(c,dia)=>{const [y,m]=c.split("-").map(Number); let mm=m,yy=y; if(dia>=21){mm=m-1; if(mm<1){mm=12;yy--;}} return yy+"-"+pp(mm)+"-"+pp(dia); };
+const fechaEsp=(c,dia,cuenta)=>{const [y,m]=c.split("-").map(Number); let mm=m,yy=y; if(dia>corteDe(cuenta)){mm=m-1; if(mm<1){mm=12;yy--;}} return yy+"-"+pp(mm)+"-"+pp(dia); };
 // ====== FUENTE REMOTA ======
 // URL /exec del Web App de Apps Script que sirve el bloque DATA del HTML en Drive
 // (ver apps_script_datos.txt). Vacía => la app usa solo los datos embebidos.
@@ -533,7 +538,7 @@ function App(){
       if(tx) used.add(tx.id);
       const manual=!!fijoChk[ciclo+"|"+f.nombre];
       const pagado=!!tx||manual;
-      const fEsp=fechaEsp(ciclo,f.dia);
+      const fEsp=fechaEsp(ciclo,f.dia,f.cuenta);
       const atrasado=!pagado&&ciclo===CICLO_HOY&&fEsp<HOY;
       return {...f,tx,manual,pagado,atrasado,fEsp,montoReal:tx?tx.monto:f.monto};
     }).sort((a,b)=>a.fEsp<b.fEsp?-1:1);
@@ -544,7 +549,7 @@ function App(){
     if(!m) return {items:[],proy:[],totPend:0,totPendEsp:0,carga:0,cargaEsp:0,fin:null};
     let qi=0;
     const items=m.cuotas.map(t=>{
-      const base=t.ciclo||cycleOf(t.fecha);
+      const base=cycleTx(t);
       const elapsed=Math.max(0,cycleDiff(CICLO_HOY,base));
       // n=0 ("00/N" en el estado): la primera cuota se factura en el ciclo de la fila
       const nRaw=(t.cuota.n>0?t.cuota.n:1)+elapsed;
@@ -557,10 +562,10 @@ function App(){
       return {...t,nAct,restIncl,pend,ultimo,estimado:elapsed>0,activa:restIncl>0,esp:esEsp(t),futura};
     }).sort((a,b)=>(a.activa===b.activa)?(a.pend<b.pend?1:-1):(a.activa?-1:1))
       .map(t=>({...t,color:t.esp?"#F2B544":(t.activa?QPAL[(qi++)%QPAL.length]:"#C9CDD6")}));
-    const maxRest=items.reduce((a,t)=>Math.max(a,t.restIncl+(t.futura?cycleDiff(t.ciclo||cycleOf(t.fecha),CICLO_HOY):0)),0);
+    const maxRest=items.reduce((a,t)=>Math.max(a,t.restIncl+(t.futura?cycleDiff(cycleTx(t),CICLO_HOY):0)),0);
     const proy=[]; for(let k=0;k<maxRest;k++){
       const ck=cycleAdd(CICLO_HOY,k);
-      const act=items.filter(t=>{ if(!t.activa) return false; if(t.futura){ const b=t.ciclo||cycleOf(t.fecha); const d=cycleDiff(ck,b); return d>=0&&d<t.cuota.de; } return t.restIncl>k; });
+      const act=items.filter(t=>{ if(!t.activa) return false; if(t.futura){ const b=cycleTx(t); const d=cycleDiff(ck,b); return d>=0&&d<t.cuota.de; } return t.restIncl>k; });
       proy.push({c:ck,monto:act.reduce((a,t)=>a+t.cuota.valor,0),espM:act.filter(t=>t.esp).reduce((a,t)=>a+t.cuota.valor,0),act});
     }
     const totPend=items.reduce((a,t)=>a+t.pend,0), totPendEsp=items.filter(t=>t.esp).reduce((a,t)=>a+t.pend,0);
@@ -628,6 +633,11 @@ function App(){
     const ingresos=rows0.filter(t=>t.flow==="in"&&!t.excl&&inC(t)&&okT(t)).reduce((a,t)=>a+t.monto,0);
     return {cons,fijo,fijoAct,cuota,cuotaEsp,vac,bal,exc,sinExc:bal-exc,viajes,ingresos};
   };
+  // estado del ciclo de cada tarjeta según su propio corte
+  const estadoCorte=corte=>{ const fin=new Date(ciclo+"-"+pp(corte)+"T00:00:00"); const ini=new Date(fin); ini.setMonth(ini.getMonth()-1); ini.setDate(corte+1);
+    const ff=pp(corte)+"/"+ciclo.slice(5); const d=Math.round((fin-hoyD)/864e5);
+    if(hoyD>fin) return "cerró el "+ff; if(hoyD<ini) return "aún no comienza · cierra el "+ff; return "cierra el "+ff+" · faltan "+d+" d"; };
+  const estadoCard=T=>T.k==="CHL"?estadoCorte(CORTE_BDC):T.k==="STG"?estadoCorte(CORTE_STG):T.k==="todas"?"BdC cierra "+pp(CORTE_BDC)+"/"+ciclo.slice(5)+" · Santander "+pp(CORTE_STG)+"/"+ciclo.slice(5):"";
   const cardVals=TARJ.map(T=>({T,v:calcCard(T)}));
   const curCard=cardVals.find(x=>x.T.k===card)||cardVals[0];
   const cv=curCard.v, esTodas=card==="todas";
@@ -678,7 +688,7 @@ function App(){
     <div className="mesbar">
       <button className="ibtn" aria-label="Ciclo anterior" disabled={!ciclosL.includes(prevC)} onClick={()=>setCiclo(prevC)}>‹</button>
       <div style={{textAlign:"center"}}><div style={{fontSize:16,fontWeight:800}}>{mesLargo(ciclo)}</div>
-        <div style={{fontSize:12,color:"var(--muted)"}}>{esHoy?"En curso · faltan "+faltan+" días":(info&&info.bdc?"Facturado":"Cerrado")}</div></div>
+        <div style={{fontSize:12,color:"var(--muted)"}}>{esHoy?"Ciclo en curso":"Ciclo "+(info&&info.bdc?"facturado":"cerrado")}</div></div>
       <button className="ibtn" aria-label="Ciclo siguiente" disabled={ciclo>=CICLO_HOY} onClick={()=>setCiclo(nextC)}>›</button>
     </div>
 
@@ -689,6 +699,7 @@ function App(){
             <span className="k" style={{color:T.mu}}>{T.nombre}</span>
             {T.num&&<span style={{fontSize:12,color:T.mu}}>{T.num}</span>}
           </div>
+          {estadoCard(T)&&<span style={{fontSize:11.5,fontWeight:600,color:T.mu,marginTop:-14}}>{estadoCard(T)}</span>}
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
             <span className="big">{clp(v.bal)}</span>
             <span className="s" style={{color:T.mu}}>{v.exc>0?"(sin excepcionales "+clp(v.sinExc)+")":T.sub}</span>
@@ -780,7 +791,7 @@ function App(){
         <div className="t"><span className="sq" style={{background:t.color}}/><span className="n">{t.comercio}</span><span className="v">{clp(t.cuota.valor)}/mes</span></div>
         <div className="pb"><i style={{width:Math.max(2,(t.futura?0:t.nAct/t.cuota.de)*100)+"%",background:t.color}}/></div>
         <div className="f"><span>{t.futura?"Aún sin cobrar · "+t.cuota.de+" cuotas":"Cuota "+t.nAct+" de "+t.cuota.de+(t.estimado?" (est.)":"")+" · quedan "+(t.cuota.de-t.nAct)}</span>
-          <span>{t.futura?"1ª: "+mesNom(t.ciclo||cycleOf(t.fecha)):"Última: "+mesNom(t.ultimo)}</span></div>
+          <span>{t.futura?"1ª: "+mesNom(cycleTx(t)):"Última: "+mesNom(t.ultimo)}</span></div>
         {(t.esp||/^manual/.test(t.id))&&<span className={"tag "+(t.esp?"t-exc":"t-fij")} style={{alignSelf:"flex-start"}}>{t.esp?"Excepcional · se paga aparte":"Cargada a mano"}</span>}
       </div>))}
       <div className="kv"><span>Saldo en cuotas (incluye este mes)</span><b>{clp(cuotasView.totPend)}</b></div>
