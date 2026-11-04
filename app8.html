@@ -109,7 +109,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-11-04 v18";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-11-04 v19";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -275,6 +275,9 @@ input.search,select.filt{font:inherit;font-size:13px;border:1px solid var(--line
 .btnx{font:inherit;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;color:var(--accent);cursor:pointer;}
 .fijorow{display:flex;gap:11px;align-items:center;padding:10px 2px;border-bottom:1px solid #F1F3F8;}
 .fijorow:last-child{border-bottom:0;}
+.fijocat{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:10px 2px 8px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;}
+.tap{cursor:pointer;}.tap:active{transform:scale(.985);}
+.k{font-size:11.5px;color:var(--muted);}
 .fijorow .fi{flex:1;min-width:0;}
 .fijorow .nm{font-size:13.5px;font-weight:600;}
 .fijorow input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#27B07A;}
@@ -330,6 +333,21 @@ function App(){
   const [token,setToken]=useState(leerToken);
   const [needKey,setNeedKey]=useState(false);
   const [keyIn,setKeyIn]=useState("");
+  const [sync,setSync]=useState("");
+  const metaT=useRef(null), sueldoT=useRef(null);
+  // v19: cada cambio se guarda en Drive (ajustes_app.json) vía Apps Script; si falla queda en cola local
+  const pushCambio=(cambios)=>{
+    let cola=[]; try{ cola=JSON.parse(localStorage.getItem("fin_cola")||"[]"); }catch(e){}
+    cola=cola.concat(cambios);
+    try{ localStorage.setItem("fin_cola",JSON.stringify(cola)); }catch(e){}
+    if(!REMOTE_URL||!token){ setSync("guardado solo en este equipo"); return; }
+    setSync("guardando…");
+    fetch(REMOTE_URL,{method:"POST",body:JSON.stringify({k:token,cambios:cola})})
+      .then(r=>r.json()).then(j=>{
+        if(j&&j.ok){ try{ localStorage.setItem("fin_cola","[]"); }catch(e){} setSync("✓ guardado "+new Date().toTimeString().slice(0,5)); }
+        else setSync("⚠ no se guardó en la nube ("+((j&&j.error)||"error")+")");
+      }).catch(()=>setSync("⚠ sin conexión: se guardará al reconectar"));
+  };
   const guardarToken=()=>{ const k=keyIn.trim(); if(!k) return; try{localStorage.setItem(TOKEN_KEY,k);}catch(e){} setToken(k); setFuente("cargando remota…"); };
   const [fijos,setFijos]=useState(FIJOS_DEF);
   const [fuenteFijos,setFuenteFijos]=useState(FIJOS_CSV_URL?"cargando…":"lista embebida");
@@ -355,9 +373,20 @@ function App(){
   // fuente remota de datos (si está configurada); ante error se mantienen los embebidos
   useEffect(()=>{ if(!REMOTE_URL) return; (async()=>{
     try{
-      const r=await fetch(REMOTE_URL+(REMOTE_URL.includes("?")?"&":"?")+"k="+encodeURIComponent(token)+"&t="+Date.now());
-      const j=await r.json();
-      if(Array.isArray(j)&&j.length&&j[0].id&&j[0].fecha){ setRows0(j); setFuente("remota · "+new Date().toTimeString().slice(0,5)); setNeedKey(false); }
+      const r=await fetch(REMOTE_URL+(REMOTE_URL.includes("?")?"&":"?")+"k="+encodeURIComponent(token)+"&vista=todo&t="+Date.now());
+      const j0=await r.json();
+      const j=Array.isArray(j0)?j0:(j0&&Array.isArray(j0.datos)?j0.datos.map(t=>t.cat_orig?{...t,cat:t.cat_orig}:t):j0);
+      const aj=j0&&j0.ajustes;
+      if(aj){
+        if(aj.cat) setOvr(p=>({...p,...aj.cat}));
+        if(aj.vac){ vacStored.current={...vacStored.current,...aj.vac}; setVac(p=>p?{...p,...aj.vac}:p); setVacKeys(p=>{const n=new Set(p);Object.keys(aj.vac).forEach(k=>n.add(k));return n;}); }
+        if(aj.fijo) setFijoChk(p=>({...p,...aj.fijo}));
+        if(aj.meta>0) setMeta(aj.meta);
+        if(aj.sueldo>0) setSueldo(aj.sueldo);
+      }
+      if(Array.isArray(j)&&j.length&&j[0].id&&j[0].fecha){ setRows0(j); setFuente("remota · "+new Date().toTimeString().slice(0,5)); setNeedKey(false);
+        let cola=[]; try{ cola=JSON.parse(localStorage.getItem("fin_cola")||"[]"); }catch(e){}
+        if(cola.length) pushCambio([]); }
       else if(j&&j.error){ setFuente("sin acceso (token)"); setNeedKey(true); }
       else setFuente("embebida (respuesta remota inválida)");
     }catch(e){ setFuente("embebida (remota no disponible)"); }
@@ -378,10 +407,10 @@ function App(){
     setVac(p=>{const np={...(p||{})}; rows0.forEach(t=>{ if(!(t.id in np)) np[t.id]=(t.id in vacStored.current)?vacStored.current[t.id]:heurVac(t); }); return np;});
   },[rows0,ready]);
 
-  const setCat=(id,c)=>{ setOvr(p=>({...p,[id]:c})); store.set("cat:"+id,c); };
-  const toggleVac=(id)=>{ setVac(p=>{const nv={...p,[id]:!p[id]}; store.set("vac:"+id,nv[id]?"1":"0"); return nv;}); setVacKeys(p=>new Set(p).add(id)); };
-  const saveMeta=(x)=>{ setMeta(x); store.set("meta",String(x)); };
-  const saveSueldo=(x)=>{ setSueldo(x); store.set("sueldo",String(x)); };
+  const setCat=(id,c)=>{ setOvr(p=>({...p,[id]:c})); store.set("cat:"+id,c); pushCambio([{tipo:"cat",id,valor:c}]); };
+  const toggleVac=(id)=>{ const nv=!(vac&&vac[id]); setVac(p=>({...p,[id]:nv})); store.set("vac:"+id,nv?"1":"0"); setVacKeys(p=>new Set(p).add(id)); pushCambio([{tipo:"vac",id,valor:nv}]); };
+  const saveMeta=(x)=>{ setMeta(x); store.set("meta",String(x)); clearTimeout(metaT.current); metaT.current=setTimeout(()=>pushCambio([{tipo:"meta",valor:x}]),1500); };
+  const saveSueldo=(x)=>{ setSueldo(x); store.set("sueldo",String(x)); clearTimeout(sueldoT.current); sueldoT.current=setTimeout(()=>pushCambio([{tipo:"sueldo",valor:x}]),1500); };
   const exportOvr=async()=>{
     const v={}; vacKeys.forEach(id=>{ if(vac&&(id in vac)) v[id]=vac[id]; });
     const payload=JSON.stringify({meta,cat:ovr,vac:v},null,1);
@@ -445,7 +474,7 @@ function App(){
   useEffect(()=>{ if(ciclosL.length&&!ciclosL.includes(ciclo)) setCiclo(ciclosL.includes(CICLO_HOY)?CICLO_HOY:ciclosL[0]); },[ciclosL]);
 
   const toggleFijo=(nombre)=>{ const key=ciclo+"|"+nombre;
-    setFijoChk(p=>{const np={...p,[key]:!p[key]}; store.set("fijo:"+key,np[key]?"1":"0"); return np;}); };
+    const nv=!fijoChk[key]; setFijoChk(p=>({...p,[key]:nv})); store.set("fijo:"+key,nv?"1":"0"); pushCambio([{tipo:"fijo",id:key,valor:nv}]); };
   const fijosView=useMemo(()=>{
     const used=new Set();
     return fijos.filter(f=>f.activo).map(f=>{
@@ -520,13 +549,14 @@ function App(){
    <div className="main">
     <div className="hdr">
       <div><div className="eyebrow">Control de flujo personal</div><h1 className="h1">Mis finanzas</h1>
-        <div className="chip" style={{marginTop:3}}>build {BUILD} · datos al {fdate(dataMax)} · fuente {fuente}</div></div>
+        <div className="chip" style={{marginTop:3}}>build {BUILD} · datos al {fdate(dataMax)} · fuente {fuente}{sync&&<> · {sync}</>}</div></div>
       <div className="reserva"><span>🔒</span><span>Fondo a invertir (no disponible): <b className="num">{clp(RESERVA_CHL)}</b></span></div>
     </div>
     {needKey && <div className="aside" style={{marginBottom:12}}>🔑 Ingresa el token del Apps Script (sale en el registro de <b>configurarV6</b>) para ver tus datos:
       <div style={{display:"flex",gap:8,marginTop:8}}><input className="search" style={{flex:1}} value={keyIn} onChange={e=>setKeyIn(e.target.value)} placeholder="token" autoCapitalize="off" autoCorrect="off"/><button onClick={guardarToken}>Guardar</button></div></div>}
     <div className="tabs">
-      <button className={tab==="periodo"?"on":""} onClick={()=>setTab("periodo")}>Período</button>
+      <button className={tab==="periodo"?"on":""} onClick={()=>setTab("periodo")}>Resumen</button>
+      <button className={tab==="consumo"?"on":""} onClick={()=>setTab("consumo")}>Consumo</button>
       <button className={tab==="fijos"?"on":""} onClick={()=>setTab("fijos")}>Fijos</button>
       <button className={tab==="cuotas"?"on":""} onClick={()=>setTab("cuotas")}>Cuotas</button>
       <button className={tab==="meses"?"on":""} onClick={()=>setTab("meses")}>Meses</button>
@@ -539,11 +569,11 @@ function App(){
       <select className="filt" value={ciclo} onChange={e=>setCiclo(e.target.value)} style={{padding:"5px 8px",fontSize:12}}>
         {ciclosL.map(c=><option key={c} value={c}>{cycleLabel(c)+(c===CICLO_HOY?" · ciclo en curso":"")}</option>)}
       </select>
-      {ciclo===CICLO_HOY&&<span className="chip" style={{color:"var(--save)",fontWeight:600}}>en curso · va en el día {HOY.slice(8)}</span>}
+      {ciclo===CICLO_HOY&&<span className="chip" style={{color:"var(--save)",fontWeight:600}}>en curso · día {Math.round((new Date(HOY)-new Date(cycStart(ciclo)))/864e5)+1} del ciclo</span>}
       {!info&&<span className="chip">sin estado de cuenta aún — cifras provisorias desde notificaciones</span>}
     </div>
     <div className="cardgrid" style={{marginTop:10}}>
-      <div className="card" style={{background:COL.cons+"10",borderColor:COL.cons+"33"}}>
+      <div className="card tap" onClick={e=>{if(e.target.tagName!=="INPUT")setTab("consumo");}} style={{background:COL.cons+"10",borderColor:COL.cons+"33"}}>
         <div className="lbl">Consumo del mes <span className="chip">(sin cuotas ni fijos)</span></div>
         <div className="big num" style={{color:COL.cons}}>{clp(m.consN)}</div>
         <div className="sub">meta <span className="editbox"><span style={{color:"var(--muted)"}}>$</span>
@@ -552,12 +582,12 @@ function App(){
                        : <> · <b style={{color:COL.cons}}>{clp(-restante)} sobre la meta</b></>}
         </div>
       </div>
-      <div className="card" style={{background:COL.fijo+"10",borderColor:COL.fijo+"33"}}>
+      <div className="card tap" onClick={()=>setTab("fijos")} style={{background:COL.fijo+"10",borderColor:COL.fijo+"33"}}>
         <div className="lbl">Gastos fijos mes {ciclo===CICLO_HOY&&<span className="chip">(base esperada)</span>}</div>
         <div className="big num" style={{color:COL.fijo}}>{clp(fijoProj)}</div>
         <div className="sub">{ciclo===CICLO_HOY?<>cargado {clp(m.fijo)} · pendiente {clp(Math.max(0,fijoProj-m.fijo))}</>:<>suscripciones, seguros, CAE, comisiones y lista maestra</>}</div>
       </div>
-      <div className="card" style={{background:COL.cuota+"10",borderColor:COL.cuota+"33"}}>
+      <div className="card tap" onClick={()=>setTab("cuotas")} style={{background:COL.cuota+"10",borderColor:COL.cuota+"33"}}>
         <div className="lbl">Cuotas mes {ciclo===CICLO_HOY&&<span className="chip">(proyectado)</span>}</div>
         <div className="big num" style={{color:COL.cuota}}>{clp(cuotaProj)}</div>
         {sinEsp(cuotaProj)}
@@ -572,6 +602,29 @@ function App(){
       </div>
     </div>
 
+    {ciclo===CICLO_HOY&&(()=>{
+      const ini=cycStart(ciclo);
+      const dTot=Math.round((new Date(ciclo+"-20")-new Date(ini))/864e5)+1;
+      const dTr=Math.max(1,Math.min(dTot,Math.round((new Date(HOY)-new Date(ini))/864e5)+1));
+      const totProj=Math.round(m.consN*dTot/dTr)+fijoProj+cuotaProj;
+      const delta=sueldo-(totProj-cuotaEspProj);
+      return(<div className="panel tap" onClick={()=>setTab("consumo")} style={{marginTop:12,padding:"13px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
+        <div><div className="k">Proyección al cierre (día {dTr} de {dTot})</div><div className="num" style={{fontSize:18,fontWeight:700}}>{clp(totProj)}</div></div>
+        <div style={{textAlign:"right"}}><div className="k">vs sueldo{cuotaEspProj>0?" (sin "+ESP_LBL+")":""}</div><div className="num" style={{fontSize:18,fontWeight:700,color:delta>=0?"var(--save)":COL.cons}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</div></div>
+      </div>);})()}
+    {m.vacN>0&&<div className="aside">✈ Vacaciones/viajes aparte: <b className="num">{clp(m.vacN)}</b>{m.viajes.length?" ("+m.viajes.join(", ")+")":""}</div>}
+    <div className="chip" style={{marginTop:10}}>Toca una tarjeta para ver el detalle.</div>
+    </>}
+
+    {tab==="consumo" && <>
+    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"12px 0 0"}}>
+      <span className="chip">Ciclo facturación BdC</span>
+      <select className="filt" value={ciclo} onChange={e=>setCiclo(e.target.value)} style={{padding:"5px 8px",fontSize:12}}>
+        {ciclosL.map(c=><option key={c} value={c}>{cycleLabel(c)+(c===CICLO_HOY?" · ciclo en curso":"")}</option>)}
+      </select>
+      {ciclo===CICLO_HOY&&<span className="chip" style={{color:"var(--save)",fontWeight:600}}>en curso · día {Math.round((new Date(HOY)-new Date(cycStart(ciclo)))/864e5)+1} del ciclo</span>}
+      {!info&&<span className="chip">sin estado de cuenta aún — cifras provisorias desde notificaciones</span>}
+    </div>
     <div className="panel" style={{marginTop:13,padding:"15px 18px"}}>
       <div className="sectitle">Composición del gasto del período · {clp(totBar)}</div>
       <div className="stackbar">
@@ -645,8 +698,8 @@ function App(){
           </div></div>);})}
     </div>
 
-    <div className="grid2">
-      <div className="panel" style={{padding:"16px 18px"}}>
+    <div>
+      <div className="panel" style={{padding:"16px 18px",marginTop:13}}>
         <div className="sectitle">Costo por categoría <span className="chip">consumo del mes en detalle · cuotas y fijos agrupados · sin vacaciones</span></div>
         <div className="donutrow">
           <div style={{width:160,height:160,position:"relative",flex:"none"}}>
@@ -663,20 +716,6 @@ function App(){
               <span className="num" style={{color:"var(--muted)"}}>{clp(v)}</span>
               <span className="num chip" style={{width:36,textAlign:"right"}}>{Math.round(v/totalDona*100)}%</span></div>))}
           </div>
-        </div>
-      </div>
-      <div className="panel" style={{padding:"16px 18px"}}>
-        <div className="sectitle">Compras en cuotas</div>
-        <div className="cuoSum" style={{marginTop:11}}>
-          <div><div className="k">Cuotas de este ciclo</div><div className="num" style={{fontSize:19,fontWeight:700,color:COL.cuota}}>{clp(cuotasView.carga)}</div>
-            {cuotasView.cargaEsp>0&&<span className="sinesp">(sin {ESP_LBL}: {clp(cuotasView.carga-cuotasView.cargaEsp)})</span>}</div>
-        </div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {cuotasView.items.filter(t=>t.activa).map(t=>{const c=t.cuota;return(<div key={t.id}>
-            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:3}}>
-              <span>{t.comercio} <span className="chip">({t.nAct}/{c.de}{t.estimado?" est.":""})</span>{t.esp&&<span className="espbadge">★ aparte</span>}</span><span className="num" style={{fontWeight:600}}>{clp(c.valor)}</span></div>
-            <div className="bar"><i style={{width:(t.nAct/c.de*100)+"%",background:t.esp?COL.esp:COL.cuota}}/></div>
-            <div className="num" style={{fontSize:11,color:"var(--muted)",marginTop:3}}>total compra {clp(c.total)} · última cuota {mesNom(t.ultimo)}</div></div>)})}
         </div>
       </div>
     </div>
@@ -740,12 +779,16 @@ function App(){
         <div key={k}><div className="k" style={{color:ACC[k].c}}>{({"STG-TC":"Santander TC","STG-CC":"Santander CC","CHL-TC":"BdC TC","CHL-TC-INT":"BdC TC Int.","CHL-CC":"BdC CC"})[k]}</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:3}}>{clp(espByAcc[k])}</div></div>))}
       {espByAcc["—"]>0&&<div><div className="k">Sin cuenta asignada</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:3,color:"var(--muted)"}}>{clp(espByAcc["—"])}</div></div>}
     </div>
-    <div className="panel" style={{marginTop:12,padding:"4px 14px"}}>
-      {fijosView.map(f=>(
+    {Object.entries(fijosView.reduce((o,f)=>{(o[f.categoria||"Otros"]=o[f.categoria||"Otros"]||[]).push(f);return o;},{}))
+      .sort((a,b)=>b[1].reduce((x,f)=>x+f.monto,0)-a[1].reduce((x,f)=>x+f.monto,0)).map(([cat,lista])=>(
+    <div key={cat} className="panel" style={{marginTop:12,padding:"4px 14px"}}>
+      <div className="fijocat"><span>{cat} <span className="chip">({lista.length})</span></span>
+        <span className="num">{clp(lista.reduce((x,f)=>x+f.monto,0))}{lista.some(f=>!f.pagado)&&<span className="chip"> · pend. {clp(lista.filter(f=>!f.pagado).reduce((x,f)=>x+f.monto,0))}</span>}</span></div>
+      {lista.map(f=>(
       <div key={f.nombre} className="fijorow">
         <input type="checkbox" checked={f.pagado} disabled={!!f.tx} onChange={()=>toggleFijo(f.nombre)}/>
         <div className="fi">
-          <div className="nm">{f.nombre} {f.cuenta&&ACC[f.cuenta]&&<span className="tag" style={{background:ACC[f.cuenta].c+"18",color:ACC[f.cuenta].c}}>{ACC[f.cuenta].s}</span>} <span className="chip">{f.categoria} · día {f.dia}</span></div>
+          <div className="nm">{f.nombre} {f.cuenta&&ACC[f.cuenta]&&<span className="tag" style={{background:ACC[f.cuenta].c+"18",color:ACC[f.cuenta].c}}>{ACC[f.cuenta].s}</span>} <span className="chip">día {f.dia}</span></div>
           <div className="chip">{f.tx?("pagado el "+fdate(f.tx.fecha)+" — "+f.tx.comercio):(f.manual?"marcado manualmente":(f.atrasado?"⚠ atrasado — se esperaba el "+fdate(f.fEsp):"esperado el "+fdate(f.fEsp)))}</div>
         </div>
         <div className="rt">
@@ -753,7 +796,7 @@ function App(){
           {f.tx&&f.tx.monto!==f.monto&&<div className="chip num">esperado {clp(f.monto)}</div>}
         </div>
       </div>))}
-    </div>
+    </div>))}
     <div className="chip" style={{marginTop:10,lineHeight:1.6}}>
       El ✓ es automático al detectar el cargo del ciclo (por patrón de comercio); usa el checkbox para pagos hechos por fuera.
       La lista maestra se edita en tu Google Sheet (columnas: nombre, categoria, monto, dia, patron, activo, cuenta).
