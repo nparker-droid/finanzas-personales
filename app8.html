@@ -109,7 +109,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-10-06 v17";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-11-04 v18";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -165,6 +165,13 @@ const fechaEsp=(c,dia)=>{const [y,m]=c.split("-").map(Number); let mm=m,yy=y; if
 // URL /exec del Web App de Apps Script que sirve el bloque DATA del HTML en Drive
 // (ver apps_script_datos.txt). Vacía => la app usa solo los datos embebidos.
 const REMOTE_URL = "https://script.google.com/macros/s/AKfycbzHHGuSfrc72Api2UW6PUV8un82QzRyxp92TcOIRy7AESs0VnERx8k_q6dmZmDhTw0Bnw/exec";
+// v18: el Web App exige token (?k=). Se toma del link (?k=...) una vez y queda guardado en el equipo.
+const TOKEN_KEY="fin_token";
+const leerToken=()=>{
+  try{ const u=new URL(location.href); const k=u.searchParams.get("k");
+    if(k){ localStorage.setItem(TOKEN_KEY,k); u.searchParams.delete("k"); history.replaceState(null,"",u.pathname+(u.search||"")+u.hash); return k; } }catch(e){}
+  try{ return localStorage.getItem(TOKEN_KEY)||""; }catch(e){ return ""; }
+};
 const inWin = f => VAC_WINDOWS.some(([a,b])=>f>=a&&f<=b);
 // Filas con "viaje" (publicadas en notifs_*.json) cuentan como vacaciones sin depender de VAC_WINDOWS
 const heurVac = t => t.flow==="out"&&!t.excl&&(!!t.viaje || inWin(t.fecha)&&t.cat!=="Suscripciones"
@@ -320,6 +327,10 @@ function App(){
   const [vacKeys,setVacKeys]=useState(new Set());
   const [rows0,setRows0]=useState(DATA_C);
   const [fuente,setFuente]=useState(REMOTE_URL?"cargando remota…":"embebida");
+  const [token,setToken]=useState(leerToken);
+  const [needKey,setNeedKey]=useState(false);
+  const [keyIn,setKeyIn]=useState("");
+  const guardarToken=()=>{ const k=keyIn.trim(); if(!k) return; try{localStorage.setItem(TOKEN_KEY,k);}catch(e){} setToken(k); setFuente("cargando remota…"); };
   const [fijos,setFijos]=useState(FIJOS_DEF);
   const [fuenteFijos,setFuenteFijos]=useState(FIJOS_CSV_URL?"cargando…":"lista embebida");
   const [fijoChk,setFijoChk]=useState({});
@@ -344,12 +355,13 @@ function App(){
   // fuente remota de datos (si está configurada); ante error se mantienen los embebidos
   useEffect(()=>{ if(!REMOTE_URL) return; (async()=>{
     try{
-      const r=await fetch(REMOTE_URL+(REMOTE_URL.includes("?")?"&":"?")+"t="+Date.now());
+      const r=await fetch(REMOTE_URL+(REMOTE_URL.includes("?")?"&":"?")+"k="+encodeURIComponent(token)+"&t="+Date.now());
       const j=await r.json();
-      if(Array.isArray(j)&&j.length&&j[0].id&&j[0].fecha){ setRows0(j); setFuente("remota · "+new Date().toTimeString().slice(0,5)); }
+      if(Array.isArray(j)&&j.length&&j[0].id&&j[0].fecha){ setRows0(j); setFuente("remota · "+new Date().toTimeString().slice(0,5)); setNeedKey(false); }
+      else if(j&&j.error){ setFuente("sin acceso (token)"); setNeedKey(true); }
       else setFuente("embebida (respuesta remota inválida)");
     }catch(e){ setFuente("embebida (remota no disponible)"); }
-  })();},[]);
+  })();},[token]);
 
   // lista de gastos fijos desde Google Sheet publicada (si está configurada)
   useEffect(()=>{ if(!FIJOS_CSV_URL) return; (async()=>{
@@ -511,6 +523,8 @@ function App(){
         <div className="chip" style={{marginTop:3}}>build {BUILD} · datos al {fdate(dataMax)} · fuente {fuente}</div></div>
       <div className="reserva"><span>🔒</span><span>Fondo a invertir (no disponible): <b className="num">{clp(RESERVA_CHL)}</b></span></div>
     </div>
+    {needKey && <div className="aside" style={{marginBottom:12}}>🔑 Ingresa el token del Apps Script (sale en el registro de <b>configurarV6</b>) para ver tus datos:
+      <div style={{display:"flex",gap:8,marginTop:8}}><input className="search" style={{flex:1}} value={keyIn} onChange={e=>setKeyIn(e.target.value)} placeholder="token" autoCapitalize="off" autoCorrect="off"/><button onClick={guardarToken}>Guardar</button></div></div>}
     <div className="tabs">
       <button className={tab==="periodo"?"on":""} onClick={()=>setTab("periodo")}>Período</button>
       <button className={tab==="fijos"?"on":""} onClick={()=>setTab("fijos")}>Fijos</button>
