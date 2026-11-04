@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F6F8FC">
+<meta name="theme-color" content="#F2F2F7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -109,7 +113,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-11-04 v19";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-11-04 v20";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -203,120 +207,136 @@ const store = {
     try{ return Object.keys(localStorage).filter(k=>k.startsWith(p)); }catch(e){ return []; } },
 };
 
+
 const CSS = `
-.wrap{--ink:#2A2F3B;--paper:#F6F8FC;--panel:#FFFFFF;--line:#E8EBF2;--muted:#8A90A0;
- --cons:#F2724B;--fijo:#6271E6;--cuota:#1FB39A;--save:#27B07A;--accent:#3460E0;
- background:var(--paper);color:var(--ink);min-height:100%;
- font-family:Inter,system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.45;}
+.wrap{--ink:#111827;--paper:#F2F2F7;--panel:#FFFFFF;--line:#EEEFF3;--muted:#5B6170;--muted2:#3F4554;
+ --navy:#14213D;--navy2:#2E3E60;--blue:#1F4FBF;--cons:#FF9F5A;--cuo:#7FB0FF;--fij:#C3CBDB;--save:#1D8A4E;--warn:#B45309;
+ background:var(--paper);color:var(--ink);min-height:100vh;
+ font-family:Manrope,system-ui,-apple-system,sans-serif;font-size:14px;line-height:1.4;font-variant-numeric:tabular-nums;
+ -webkit-tap-highlight-color:transparent;}
 .wrap *{box-sizing:border-box;}
-.num{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;}
-.eyebrow{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;}
-.h1{font-size:22px;font-weight:700;letter-spacing:-.01em;margin:2px 0 0;}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:13px;}
-.tabs{display:inline-flex;background:#E9EDF7;border-radius:10px;padding:3px;margin-top:14px;}
-.tabs button{font:inherit;font-size:13px;font-weight:600;padding:7px 16px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;}
-.tabs button.on{background:#fff;color:var(--accent);box-shadow:0 1px 3px rgba(40,70,160,.14);}
-.cardgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:12px;}
-.card{padding:15px 17px;border-radius:13px;border:1px solid var(--line);}
-.card .lbl{font-size:11.5px;color:var(--muted);font-weight:600;}
-.card .big{font-size:23px;font-weight:700;margin-top:6px;letter-spacing:-.02em;}
-.card .sub{font-size:11.5px;color:var(--muted);margin-top:7px;line-height:1.55;}
-.sectitle{font-size:13px;font-weight:700;}
-.reserva{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--muted);background:#EEF1F8;border:1px dashed #CFD6E6;border-radius:10px;padding:8px 12px;}
-.editbox{display:inline-flex;align-items:center;gap:3px;border:1px solid var(--line);border-radius:7px;padding:1px 6px;background:#fff;}
-.editbox input{font:inherit;font-family:"JetBrains Mono",monospace;font-size:13px;border:0;background:transparent;width:74px;color:var(--ink);outline:none;}
-.stackbar{display:flex;height:26px;border-radius:8px;overflow:hidden;margin-top:12px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.02);}
-.stackbar > i{display:block;height:100%;}
-.lg{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;}
-.lg .it{display:flex;align-items:center;gap:7px;font-size:12px;}
-.lg .dot{width:11px;height:11px;border-radius:4px;}
-.aside{margin-top:11px;font-size:12px;color:var(--muted);background:#FFF7F2;border:1px solid #FBE2D5;border-radius:9px;padding:8px 11px;}
-.saverow{display:flex;gap:14px;flex-wrap:wrap;margin-top:13px;}
-.savecard{flex:1;min-width:180px;border-radius:12px;padding:13px 15px;}
-.savecard .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;}
-.savecard .v{font-size:19px;font-weight:700;margin-top:4px;}
-.bankcard{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff;}
-.bankcard .top{height:5px;}
-.bankcard .body{padding:13px 15px;display:flex;justify-content:space-between;gap:10px;}
-.bankcard .col .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;}
-.bankcard .col .v{font-size:18px;font-weight:700;margin-top:3px;}
-.legend{display:flex;flex-direction:column;gap:6px;}
-.legend .row{display:flex;align-items:center;gap:8px;font-size:12px;}
-.legend .dot{width:10px;height:10px;border-radius:3px;flex:none;}
-.legend .nm{flex:1;}
-.bar{height:9px;border-radius:6px;background:#EDF0F6;overflow:hidden;}
-.bar > i{display:block;height:100%;border-radius:6px;}
-.cuoSum{display:flex;gap:18px;padding:11px 13px;background:#E9FBF6;border:1px solid #C7F0E6;border-radius:10px;margin-bottom:13px;}
-.cuoSum .k{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:600;}
-table{width:100%;border-collapse:collapse;}
-th{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left;font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--panel);}
-td{padding:8px 10px;border-bottom:1px solid #F1F3F8;font-size:13px;vertical-align:middle;}
-tr.excl td{color:#AEB3C0;} tr.vac{background:#FFF7F2;}
-.rt{text-align:right;}
-select.cat{font:inherit;font-size:12px;border:1px solid var(--line);border-radius:7px;padding:4px 6px;background:#fff;color:var(--ink);max-width:150px;}
-select.cat.edited{border-color:var(--accent);background:#EEF3FF;font-weight:600;}
-input.search,select.filt{font:inherit;font-size:13px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;color:var(--ink);}
-.chip{font-size:11px;color:var(--muted);}
-.sinesp{display:block;font-size:12px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums;}
-.espbadge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:9px;font-size:10.5px;font-weight:600;color:#9A6A00;background:#F2B33D22;border:1px solid #F2B33D55;}
-.toggle{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;}
-.toggle button{font:inherit;font-size:12px;font-weight:600;padding:5px 11px;border:0;background:#fff;color:var(--muted);cursor:pointer;}
-.toggle button.on{background:var(--accent);color:#fff;}
-.tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;}
-.bk{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;cursor:pointer;border:1px solid transparent;white-space:nowrap;}
-.mtab td,.mtab th{font-size:12px;}
-.mtab td.n{font-family:"JetBrains Mono",monospace;font-variant-numeric:tabular-nums;text-align:right;}
-.mtab{min-width:640px;}
-.main{max-width:1120px;margin:0 auto;padding:22px 20px 40px;}
-.hdr{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px;}
-.donutrow{display:flex;gap:14px;margin-top:8px;align-items:center;}
-.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
-.btnx{font:inherit;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:#fff;color:var(--accent);cursor:pointer;}
-.fijorow{display:flex;gap:11px;align-items:center;padding:10px 2px;border-bottom:1px solid #F1F3F8;}
-.fijorow:last-child{border-bottom:0;}
-.fijocat{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:10px 2px 8px;border-bottom:1px solid var(--line);font-weight:700;font-size:13.5px;}
-.tap{cursor:pointer;}.tap:active{transform:scale(.985);}
-.k{font-size:11.5px;color:var(--muted);}
-.fijorow .fi{flex:1;min-width:0;}
-.fijorow .nm{font-size:13.5px;font-weight:600;}
-.fijorow input[type=checkbox]{width:18px;height:18px;flex:none;accent-color:#27B07A;}
-.txcard{padding:11px 4px;border-bottom:1px solid #F1F3F8;}
-.txcard.excl{opacity:.6;}
-.txcard.vac{background:#FFF7F2;}
-.txcard .r1{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);flex-wrap:wrap;}
-.txcard .amt{margin-left:auto;font-size:14.5px;font-weight:700;}
-.txcard .mer{font-size:13.5px;margin-top:4px;color:var(--ink);}
-.txcard .r3{display:flex;gap:8px;align-items:center;margin-top:8px;}
-.txcard .r3 select.cat{flex:1;max-width:none;padding:8px;}
-.txcard .bk{padding:7px 11px;border-radius:8px;}
-@media(max-width:760px){
- .main{padding:14px 12px 40px;}
- .h1{font-size:20px;}
- .reserva{width:100%;}
- .tabs{display:flex;width:100%;}
- .tabs button{flex:1;padding:10px 6px;}
- .grid2{grid-template-columns:1fr;gap:11px;}
- .cardgrid{grid-template-columns:1fr 1fr;gap:9px;}
- .card{padding:12px 12px;}
- .card .big{font-size:18px;}
- .savecard{min-width:145px;padding:12px 13px;}
- .savecard .v{font-size:17px;}
- .bankcard .body{flex-direction:column;gap:9px;}
- .bankcard .col.rt{text-align:left;}
- .donutrow{flex-direction:column;}
- .donutrow .legend{width:100%;}
- .cuoSum{flex-wrap:wrap;gap:12px;}
- .filters .sectitle{flex:1 1 100%;margin-right:0!important;}
- .filters .search{flex:1 1 100%;min-width:0;}
- select.filt{flex:1;min-width:0;}
- .lg{gap:10px 14px;}
-}
-@media(max-width:380px){.cardgrid{grid-template-columns:1fr;}}
+.main{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 18px) 20px calc(env(safe-area-inset-bottom) + 110px);display:flex;flex-direction:column;gap:20px;}
+.hdr{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;}
+.hdr .d{font-size:13px;color:var(--muted);}
+.h1{margin:0;font-size:30px;font-weight:800;letter-spacing:-.02em;}
+.ibtn{width:44px;height:44px;border-radius:22px;border:0;background:#fff;color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none;}
+.ibtn.on{background:var(--navy);color:#fff;}
+.sec{font-size:13px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.04em;padding:0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
+.sec .r{text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted);}
+.box{background:#fff;border-radius:16px;}
+.list{background:#fff;border-radius:16px;padding:0 16px;display:flex;flex-direction:column;}
+.row{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 0;border-top:1px solid var(--line);}
+.row:first-child{border-top:0;}
+.row.tap{cursor:pointer;}
+.row .ic{width:40px;height:40px;border-radius:20px;flex:none;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;}
+.row .mid{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.row .sub{font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.row .amt{font-size:15px;font-weight:700;white-space:nowrap;text-align:right;}
+.row.excl{opacity:.55;}
+.tag{font-size:11px;font-weight:700;border-radius:6px;padding:2px 6px;white-space:nowrap;}
+.t-exc{color:#7A4A00;background:#FDEBC8;} .t-cuo{color:#163A8C;background:#E6EEFF;} .t-fij{color:var(--muted2);background:#ECEDF1;}
+.t-in{color:#1D6B3A;background:#E3F5EA;} .t-warn{color:#8A3B00;background:#FFE9D9;}
+/* carrusel */
+.car{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -20px;padding:0 calc(50% - 150px);position:relative;scrollbar-width:none;}
+.car::-webkit-scrollbar{display:none;}
+.wc{flex:0 0 300px;height:196px;border-radius:18px;padding:18px;scroll-snap-align:center;display:flex;flex-direction:column;justify-content:space-between;border:0;text-align:left;font:inherit;color:inherit;}
+.wc.cur{background:var(--navy);color:#fff;}
+.wc.past{background:var(--navy2);color:#fff;cursor:pointer;}
+.wc.proj{background:#fff;border:2px dashed #9AA6C0;color:var(--navy);}
+.wc .k{font-size:13px;font-weight:600;color:#B9C2D6;}
+.wc.past .k{color:#C9D1E2;} .wc.proj .k{color:#4A5A7A;}
+.wc .big{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1.05;}
+.wc .s{font-size:14px;color:#B9C2D6;}
+.wc.past .s{color:#C9D1E2;} .wc.proj .s{color:#4A5A7A;font-size:12.5px;line-height:1.4;}
+.seg3{display:flex;height:8px;gap:3px;}
+.seg3 i{display:block;border-radius:4px;min-width:3px;}
+.dots{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:-8px;}
+.dots i{display:block;width:6px;height:6px;border-radius:3px;background:#9AA6C0;}
+.dots i.on{width:18px;background:var(--navy);}
+.dots span{font-size:12px;color:var(--muted);margin-left:6px;}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.tile{background:#fff;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:6px;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer;}
+.tile .dot{width:10px;height:10px;border-radius:5px;}
+.tile .l{font-size:12px;color:var(--muted);}
+.tile .v{font-size:16px;font-weight:800;}
+.tile .x{font-size:11px;color:var(--muted);}
+.segc{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;background:#E3E4EA;border-radius:12px;padding:4px;}
+.segc button{height:36px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:13px;font-weight:600;color:var(--muted2);cursor:pointer;padding:0 2px;}
+.segc button.on{background:#fff;font-weight:800;color:var(--ink);}
+.inp{font:inherit;font-size:15px;border:1px solid #DADCE3;border-radius:10px;padding:10px 12px;background:#fff;color:var(--ink);width:100%;}
+.btn{font:inherit;font-size:15px;font-weight:700;border:0;border-radius:12px;padding:12px 16px;background:var(--navy);color:#fff;cursor:pointer;}
+.btn.sec2{background:#E6EEFF;color:var(--blue);}
+.btn.ghost{background:transparent;color:var(--blue);padding:12px 0;}
+.alert{background:#FFF4E5;border-radius:14px;padding:12px 14px;font-size:13px;color:#7A4A00;line-height:1.45;}
+.strip{background:#fff;border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.strip .k{font-size:12px;color:var(--muted);}
+.strip .v{font-size:17px;font-weight:800;}
+/* barra inferior */
+.tabbar{position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid #DADCE3;padding:8px 0 calc(env(safe-area-inset-bottom) + 8px);z-index:20;}
+.tabbar .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));}
+.tabbar button{border:0;background:transparent;font:inherit;font-size:11px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;min-height:48px;}
+.tabbar button.on{color:var(--blue);font-weight:700;}
+/* hoja inferior */
+.scrim{position:fixed;inset:0;background:rgba(17,24,39,.35);z-index:30;display:flex;align-items:flex-end;justify-content:center;}
+.sheet{background:#F2F2F7;border-radius:22px 22px 0 0;width:100%;max-width:560px;padding:18px 20px calc(env(safe-area-inset-bottom) + 20px);display:flex;flex-direction:column;gap:14px;max-height:85vh;overflow:auto;}
+.grab{width:40px;height:5px;border-radius:3px;background:#C9CDD6;align-self:center;}
+/* cuotas */
+.navy{background:var(--navy);color:#fff;border-radius:18px;padding:20px;display:flex;flex-direction:column;gap:14px;}
+.navy .k{font-size:12.5px;color:#B9C2D6;}
+.navy .big{font-size:36px;font-weight:800;letter-spacing:-.02em;line-height:1.05;}
+.navy .g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-top:1px solid var(--navy2);padding-top:12px;}
+.navy .g2 .v{font-size:15px;font-weight:700;}
+.chart{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;align-items:end;}
+.chart .col{display:flex;flex-direction:column;gap:3px;}
+.chart .kk{font-size:9px;color:var(--muted);text-align:center;}
+.chart .bars{height:140px;display:flex;flex-direction:column;justify-content:flex-end;gap:1px;}
+.chart .bars i{display:block;border-radius:2px;}
+.chart .m{font-size:11px;text-align:center;color:var(--muted);}
+.chart .m.on{color:var(--ink);font-weight:800;}
+.qc{background:#fff;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+.qc .t{display:flex;align-items:center;gap:10px;}
+.qc .t .n{font-size:15px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.qc .t .v{font-size:15px;font-weight:800;white-space:nowrap;}
+.qc .pb{height:6px;border-radius:3px;background:#EEF1F6;overflow:hidden;}
+.qc .pb i{display:block;height:100%;border-radius:3px;}
+.qc .f{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted);}
+.sq{width:10px;height:10px;border-radius:3px;flex:none;display:inline-block;}
+.chk{width:28px;height:28px;border-radius:14px;border:2px solid #C9CDD6;background:#fff;flex:none;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;}
+.chk.on{background:var(--save);border-color:var(--save);color:#fff;}
+.chk:disabled{cursor:default;}
+.lg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;}
+.lg span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted2);}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted);padding:0 4px;}
+.kv b{color:var(--ink);}
+table.mt{width:100%;border-collapse:collapse;min-width:560px;}
+.mt th{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:right;font-weight:700;padding:8px;border-bottom:1px solid var(--line);}
+.mt th:first-child,.mt td:first-child{text-align:left;}
+.mt td{padding:8px;border-bottom:1px solid var(--line);font-size:12.5px;text-align:right;}
 `;
 
+const MESL=["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const mesLargo=c=>{const [y,m]=c.split("-").map(Number); return MESL[m-1]+(y!==Number(HOY.slice(0,4))?" "+y:"");};
+const AYER=(()=>{const d=new Date(); d.setDate(d.getDate()-1); return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
+const DIAS=["dom","lun","mar","mié","jue","vie","sáb"];
+const diaLbl=f=>{ if(f===HOY) return "Hoy"; if(f===AYER) return "Ayer"; const [y,m,d]=f.split("-").map(Number); return DIAS[new Date(y,m-1,d).getDay()]+" "+d+" "+MESN[m-1]; };
+const FECHA_HOY=(()=>{const d=new Date(); const s=d.toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"}).replace(",",""); return s.charAt(0).toUpperCase()+s.slice(1);})();
+const kfmt=n=>"$"+Math.round(n/1000)+"k";
+const QPAL=["#1F4FBF","#7FB0FF","#14213D","#4C7BE0","#BFD0F7","#2E5FA8","#9AB4E8","#5B6170"];
+const FPAL=["#14213D","#1F4FBF","#7FB0FF","#C3CBDB","#4C7BE0","#9AA6C0","#2E5FA8"];
+const BKS={cons:{bg:"#FFE9D9",fg:"#8A3B00"},cuota:{bg:"#E6EEFF",fg:"#163A8C"},fijo:{bg:"#ECEDF1",fg:"#3F4554"},vac:{bg:"#FDEBC8",fg:"#7A4A00"},in:{bg:"#E3F5EA",fg:"#1D6B3A"},excl:{bg:"#ECEDF1",fg:"#5B6170"}};
+
+const Ico={
+  wallet:<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18"/></svg>,
+  cuotas:<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 20V14M10 20V9M16 20V12M22 20V5"/></svg>,
+  fijos:<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M4 10h16"/></svg>,
+  mas:<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>,
+  buscar:<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>,
+  check:<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5 9-10"/></svg>,
+};
+
 function App(){
-  const [tab,setTab]=useState("periodo");
+  const [tab,setTab]=useState("wallet");
   const [ovr,setOvr]=useState({});
   const [vac,setVac]=useState(null);
   const [ready,setReady]=useState(false);
@@ -324,8 +344,13 @@ function App(){
   const [sueldo,setSueldo]=useState(1870000);
   const [fAcc,setFAcc]=useState("todas");
   const [fCat,setFCat]=useState("todas");
+  const [fTipo,setFTipo]=useState("todo");
   const [q,setQ]=useState("");
   const [showExcl,setShowExcl]=useState(false);
+  const [buscar,setBuscar]=useState(false);
+  const [nVer,setNVer]=useState(12);
+  const [sel,setSel]=useState(null);
+  const [verPagadas,setVerPagadas]=useState(false);
   const [ciclo,setCiclo]=useState(CICLOS.includes(CICLO_HOY)?CICLO_HOY:(CICLOS[0]||CICLO_HOY));
   const [vacKeys,setVacKeys]=useState(new Set());
   const [rows0,setRows0]=useState(DATA_C);
@@ -334,7 +359,10 @@ function App(){
   const [needKey,setNeedKey]=useState(false);
   const [keyIn,setKeyIn]=useState("");
   const [sync,setSync]=useState("");
-  const metaT=useRef(null), sueldoT=useRef(null);
+  const [log,setLog]=useState(()=>{ try{ return JSON.parse(localStorage.getItem("fin_log")||"[]"); }catch(e){ return []; } });
+  const metaT=useRef(null), sueldoT=useRef(null), carRef=useRef(null), curRef=useRef(null), carT=useRef(null), listRef=useRef(null);
+  // registro local de cambios (además del registro en Drive vía Apps Script)
+  const logCambio=(desc)=>{ setLog(p=>{ const l=[{ts:new Date().toISOString(),desc},...p].slice(0,100); try{ localStorage.setItem("fin_log",JSON.stringify(l)); }catch(e){} return l; }); };
   // v19: cada cambio se guarda en Drive (ajustes_app.json) vía Apps Script; si falla queda en cola local
   const pushCambio=(cambios)=>{
     let cola=[]; try{ cola=JSON.parse(localStorage.getItem("fin_cola")||"[]"); }catch(e){}
@@ -352,9 +380,7 @@ function App(){
   const [fijos,setFijos]=useState(FIJOS_DEF);
   const [fuenteFijos,setFuenteFijos]=useState(FIJOS_CSV_URL?"cargando…":"lista embebida");
   const [fijoChk,setFijoChk]=useState({});
-  const [soloVar,setSoloVar]=useState(false);
   const vacStored=useRef({});
-  const mobile=useMobile();
 
   useEffect(()=>{(async()=>{
     let o={}, v={};
@@ -407,21 +433,22 @@ function App(){
     setVac(p=>{const np={...(p||{})}; rows0.forEach(t=>{ if(!(t.id in np)) np[t.id]=(t.id in vacStored.current)?vacStored.current[t.id]:heurVac(t); }); return np;});
   },[rows0,ready]);
 
-  const setCat=(id,c)=>{ setOvr(p=>({...p,[id]:c})); store.set("cat:"+id,c); pushCambio([{tipo:"cat",id,valor:c}]); };
-  const toggleVac=(id)=>{ const nv=!(vac&&vac[id]); setVac(p=>({...p,[id]:nv})); store.set("vac:"+id,nv?"1":"0"); setVacKeys(p=>new Set(p).add(id)); pushCambio([{tipo:"vac",id,valor:nv}]); };
-  const saveMeta=(x)=>{ setMeta(x); store.set("meta",String(x)); clearTimeout(metaT.current); metaT.current=setTimeout(()=>pushCambio([{tipo:"meta",valor:x}]),1500); };
-  const saveSueldo=(x)=>{ setSueldo(x); store.set("sueldo",String(x)); clearTimeout(sueldoT.current); sueldoT.current=setTimeout(()=>pushCambio([{tipo:"sueldo",valor:x}]),1500); };
+  const txById=id=>rows0.find(t=>t.id===id);
+  const setCat=(id,c)=>{ setOvr(p=>({...p,[id]:c})); store.set("cat:"+id,c); pushCambio([{tipo:"cat",id,valor:c}]); const t=txById(id); logCambio("Categoría: "+(t?t.comercio:id)+" → "+c); };
+  const toggleVac=(id)=>{ const nv=!(vac&&vac[id]); setVac(p=>({...p,[id]:nv})); store.set("vac:"+id,nv?"1":"0"); setVacKeys(p=>new Set(p).add(id)); pushCambio([{tipo:"vac",id,valor:nv}]); const t=txById(id); logCambio((nv?"Marcado como viaje: ":"Quitado de viajes: ")+(t?t.comercio:id)); };
+  const saveMeta=(x)=>{ setMeta(x); store.set("meta",String(x)); clearTimeout(metaT.current); metaT.current=setTimeout(()=>{pushCambio([{tipo:"meta",valor:x}]); logCambio("Meta de compras directas: "+clp(x));},1500); };
+  const saveSueldo=(x)=>{ setSueldo(x); store.set("sueldo",String(x)); clearTimeout(sueldoT.current); sueldoT.current=setTimeout(()=>{pushCambio([{tipo:"sueldo",valor:x}]); logCambio("Sueldo: "+clp(x));},1500); };
   const exportOvr=async()=>{
     const v={}; vacKeys.forEach(id=>{ if(vac&&(id in vac)) v[id]=vac[id]; });
     const payload=JSON.stringify({meta,cat:ovr,vac:v},null,1);
-    try{ await navigator.clipboard.writeText(payload); alert("Cambios copiados al portapapeles: "+Object.keys(ovr).length+" categorías, "+Object.keys(v).length+" marcas de vacaciones."); }
+    try{ await navigator.clipboard.writeText(payload); setSync("cambios copiados al portapapeles"); }
     catch(e){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([payload],{type:"application/json"})); a.download="overrides_finanzas.json"; a.click(); }
   };
   const catOf=t=>ovr[t.id]||t.cat;
   // ¿gasto fijo? por categoría fija o por patrón de la lista maestra de fijos
   const esFijoTx=t=>FIJO.has(catOf(t))||fijos.some(f=>f.activo&&t.comercio.toLowerCase().includes((f.patron||f.nombre).toLowerCase()));
-  // Buckets: "cons" = compras particulares del ciclo (sin cuotas ni fijos);
-  // "cuota" = toda cuota facturada, incluso 1/N (detalle en pestaña Cuotas); "fijo" = fijos del ciclo (categoría o patrón)
+  // Buckets: "cons" = compras directas del ciclo (sin cuotas ni fijos);
+  // "cuota" = toda cuota facturada, incluso 1/N; "fijo" = fijos del ciclo (categoría o patrón); "vac" = viajes (aparte)
   const bucketOf=t=>{ if(!vac) return "fijo"; if(vac[t.id]) return "vac"; if(t.cuota) return "cuota"; return esFijoTx(t)?"fijo":"cons"; };
 
   const m=useMemo(()=>{
@@ -433,8 +460,6 @@ function App(){
     const reembVac=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
     const reembCons=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&!REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
     const consN=cons-reembCons, vacN=vacb-reembVac;
-    // Categorías: el detalle solo aplica al consumo del mes; todas las cuotas
-    // y los gastos fijos se agrupan en las categorías agregadas "Cuotas mes" / "Gastos fijos mes"
     const byCat={};
     out.forEach(t=>{const b=bucketOf(t); if(b==="vac") return;
       const c=b==="cuota"?"Cuotas mes":b==="fijo"?"Gastos fijos mes":catOf(t);
@@ -449,38 +474,42 @@ function App(){
       if(!p){cuoMap[k]=t;return;} const d=cycleDiff(cycleTx(t),cycleTx(p));
       if(d>0||(d===0&&t.cuota.n>p.cuota.n)) cuoMap[k]=t;});
     const cuotas=Object.values(cuoMap).sort((a,b)=>b.cuota.pendiente-a.cuota.pendiente);
-    const proxMes=cuotas.filter(t=>t.cuota.n<t.cuota.de).reduce((a,t)=>a+t.cuota.valor,0);
-    const compromiso=cuotas.reduce((a,t)=>a+t.cuota.pendiente,0);
     const met=rows0.find(t=>inC(t)&&METLIFE_RE.test(t.comercio)); const metX=met?Math.round(met.monto*0.5):0;
     const cuotaEsp=out.filter(t=>bucketOf(t)==="cuota"&&esEsp(t)).reduce((a,t)=>a+t.monto,0);
     const viajes=[...new Set(out.filter(t=>bucketOf(t)==="vac"&&t.viaje).map(t=>t.viaje))];
-    return {consN,fijo,cuota,cuotaEsp,vacN,viajes,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,proxMes,compromiso,metX};
+    return {consN,fijo,cuota,cuotaEsp,vacN,viajes,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,metX};
   },[ovr,vac,ciclo,rows0,fijos]);
+
+  // totales de un ciclo cualquiera (para las tarjetas vecinas del carrusel)
+  const totCicloTx=c=>{
+    const out=rows0.filter(t=>t.flow==="out"&&!t.excl&&cycleTx(t)===c);
+    let tot=0,exc=0; out.forEach(t=>{const b=bucketOf(t); tot+=t.monto; if(b==="vac"||(b==="cuota"&&esEsp(t))) exc+=t.monto;});
+    return {tot,exc};
+  };
 
   const rows=useMemo(()=>rows0.filter(t=>{
     if(cycleTx(t)!==ciclo) return false;
-    if(soloVar&&(t.flow!=="out"||t.excl||bucketOf(t)!=="cons")) return false;
+    if(fTipo!=="todo"&&(t.flow!=="out"||t.excl||bucketOf(t)!==fTipo)) return false;
     if(!showExcl&&t.excl) return false;
     if(fAcc!=="todas"&&t.cuenta!==fAcc) return false;
     if(fCat!=="todas"&&catOf(t)!==fCat) return false;
     if(q&&!(t.comercio.toLowerCase().includes(q.toLowerCase())||(t.ciudad||"").toLowerCase().includes(q.toLowerCase()))) return false;
     return true;
-  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0,soloVar,fijos,vac]);
+  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0,fTipo,fijos,vac]);
 
   // tripwire de duplicados: misma fecha+cuenta+monto+flow con id distinto
   const dupCands=useMemo(()=>{const seen={};let n=0;rows0.forEach(t=>{const k=t.fecha+"|"+t.cuenta+"|"+t.monto+"|"+t.flow;if(seen[k])n++;else seen[k]=1;});return n;},[rows0]);
 
   const ciclosL=useMemo(()=>[...new Set(rows0.map(t=>cycleTx(t)))].sort().reverse(),[rows0]);
   useEffect(()=>{ if(ciclosL.length&&!ciclosL.includes(ciclo)) setCiclo(ciclosL.includes(CICLO_HOY)?CICLO_HOY:ciclosL[0]); },[ciclosL]);
+  useEffect(()=>{ setNVer(12); },[ciclo,fTipo,q,fAcc,fCat]);
 
   const toggleFijo=(nombre)=>{ const key=ciclo+"|"+nombre;
-    const nv=!fijoChk[key]; setFijoChk(p=>({...p,[key]:nv})); store.set("fijo:"+key,nv?"1":"0"); pushCambio([{tipo:"fijo",id:key,valor:nv}]); };
+    const nv=!fijoChk[key]; setFijoChk(p=>({...p,[key]:nv})); store.set("fijo:"+key,nv?"1":"0"); pushCambio([{tipo:"fijo",id:key,valor:nv}]); logCambio("Fijo "+nombre+(nv?" marcado pagado":" desmarcado")+" ("+mesNom(ciclo)+")"); };
   const fijosView=useMemo(()=>{
     const used=new Set();
     return fijos.filter(f=>f.activo).map(f=>{
       const pat=(f.patron||f.nombre).toLowerCase();
-      // candidatos del ciclo por patrón; si varios fijos comparten patrón (ej. Smart Fit x2),
-      // se asigna el cargo de monto más cercano al esperado, sin reutilizar transacciones
       const tx=rows0.filter(t=>cycleTx(t)===ciclo&&t.flow==="out"&&!t.excl&&!used.has(t.id)&&t.comercio.toLowerCase().includes(pat))
         .sort((a,b)=>Math.abs(a.monto-f.monto)-Math.abs(b.monto-f.monto))[0];
       if(tx) used.add(tx.id);
@@ -495,6 +524,7 @@ function App(){
   // cuotas proyectadas: avanza n desde el último estado conciliado hasta el ciclo actual
   const cuotasView=useMemo(()=>{
     if(!m) return {items:[],proy:[],totPend:0,totPendEsp:0,carga:0,cargaEsp:0,fin:null};
+    let qi=0;
     const items=m.cuotas.map(t=>{
       const base=t.ciclo||cycleOf(t.fecha);
       const elapsed=Math.max(0,cycleDiff(CICLO_HOY,base));
@@ -503,36 +533,36 @@ function App(){
       const restIncl=Math.max(0,t.cuota.de-nRaw+1);
       const nAct=Math.min(nRaw,t.cuota.de);
       const pend=restIncl*t.cuota.valor;
-      const ultimo=restIncl>0?cycleAdd(CICLO_HOY,restIncl-1):null;
-      return {...t,nAct,restIncl,pend,ultimo,estimado:elapsed>0,activa:restIncl>0,esp:esEsp(t)};
-    }).sort((a,b)=>(a.activa===b.activa)?(a.pend<b.pend?1:-1):(a.activa?-1:1));
-    const maxRest=items.reduce((a,t)=>Math.max(a,t.restIncl),0);
+      // fila futura (1ª cuota en un ciclo posterior, ej. Entel): aún no comienza
+      const futura=cycleDiff(base,CICLO_HOY)>0;
+      const ultimo=futura?cycleAdd(base,t.cuota.de-1):(restIncl>0?cycleAdd(CICLO_HOY,restIncl-1):null);
+      return {...t,nAct,restIncl,pend,ultimo,estimado:elapsed>0,activa:restIncl>0,esp:esEsp(t),futura};
+    }).sort((a,b)=>(a.activa===b.activa)?(a.pend<b.pend?1:-1):(a.activa?-1:1))
+      .map(t=>({...t,color:t.esp?"#F2B544":(t.activa?QPAL[(qi++)%QPAL.length]:"#C9CDD6")}));
+    const maxRest=items.reduce((a,t)=>Math.max(a,t.restIncl+(t.futura?cycleDiff(t.ciclo||cycleOf(t.fecha),CICLO_HOY):0)),0);
     const proy=[]; for(let k=0;k<maxRest;k++){
-      const act=items.filter(t=>t.restIncl>k);
-      proy.push({c:cycleAdd(CICLO_HOY,k),monto:act.reduce((a,t)=>a+t.cuota.valor,0),espM:act.filter(t=>t.esp).reduce((a,t)=>a+t.cuota.valor,0)});
+      const ck=cycleAdd(CICLO_HOY,k);
+      const act=items.filter(t=>{ if(!t.activa) return false; if(t.futura){ const b=t.ciclo||cycleOf(t.fecha); const d=cycleDiff(ck,b); return d>=0&&d<t.cuota.de; } return t.restIncl>k; });
+      proy.push({c:ck,monto:act.reduce((a,t)=>a+t.cuota.valor,0),espM:act.filter(t=>t.esp).reduce((a,t)=>a+t.cuota.valor,0),act});
     }
     const totPend=items.reduce((a,t)=>a+t.pend,0), totPendEsp=items.filter(t=>t.esp).reduce((a,t)=>a+t.pend,0);
     return {items,proy,totPend,totPendEsp,carga:proy.length?proy[0].monto:0,cargaEsp:proy.length?proy[0].espM:0,fin:proy.length?proy[proy.length-1].c:null};
   },[m]);
 
-  if(!ready||!m) return <div className="wrap" style={{padding:24}}>Cargando…</div>;
+  // carrusel: centra la tarjeta del ciclo elegido
+  useEffect(()=>{ const el=carRef.current, cur=curRef.current; if(!el||!cur) return;
+    el.scrollLeft=cur.offsetLeft-(el.clientWidth-cur.clientWidth)/2; },[ciclo,tab,ready,m&&1]);
+
+  if(!ready||!m) return <div className="wrap" style={{padding:24}}><style>{CSS}</style>Cargando…</div>;
   const restante=meta-m.consN;
   const ahorroBase=Math.max(restante,0);
-  const totBar=m.consN+m.fijo+m.cuota;
   const totalDona=m.donut.reduce((a,[,v])=>a+v,0);
-  const maxProy=cuotasView.proy.reduce((a,p)=>Math.max(a,p.monto),0);
-  const BK={cons:{l:"Consumo",c:COL.cons},fijo:{l:"Fijo",c:COL.fijo},cuota:{l:"Cuota",c:COL.cuota},vac:{l:"✈ Vacaciones",c:"#E08A3C"}};
-  const chartMeses=MESES.map(x=>({mes:x.mes,"Banco de Chile":x.bdcTC,"Santander":x.stgTC}));
-  const chartAhorro=MESES.map(x=>({mes:x.mes,"Ahorro":x.ahorro,"Extra MetLife":x.ahorroX}));
-  const totAhorro=MESES.reduce((a,x)=>a+x.ahorro,0), totAhorroX=MESES.reduce((a,x)=>a+x.ahorroX,0);
   const info=CICLO_INFO[ciclo];
-  const gastTC=rows0.filter(t=>t.flow==="out"&&!t.excl&&cycleTx(t)===ciclo&&t.cuenta.includes("TC")).reduce((a,t)=>a+t.monto,0);
   const dataMax=rows0.reduce((a,t)=>t.fecha>a&&t.fecha<=HOY?t.fecha:a,"0000-00-00");
   const diasSin=Math.max(0,Math.round((new Date(HOY)-new Date(dataMax))/864e5));
   const totEsp=fijosView.reduce((a,f)=>a+f.monto,0);
   const totPag=fijosView.filter(f=>f.pagado).reduce((a,f)=>a+f.montoReal,0);
   const totPend=fijosView.filter(f=>!f.pagado).reduce((a,f)=>a+f.monto,0);
-  // Base del ciclo (sin esperar facturación): fijos esperados (lista maestra + extras ya cargados) y cuotas proyectadas
   const fijoMatched=fijosView.reduce((a,f)=>a+(f.tx?f.montoReal:0),0);
   const fijoProj=ciclo===CICLO_HOY?totEsp+Math.max(0,m.fijo-fijoMatched):m.fijo;
   const dproj=cycleDiff(ciclo,CICLO_HOY);
@@ -541,365 +571,329 @@ function App(){
   const cuotaEspProj=pj?pj.espM:m.cuotaEsp;
   const sinCuotas=m.consN+fijoProj;
   const totCiclo=sinCuotas+cuotaProj;
-  const sinEsp=v=>cuotaEspProj>0?<span className="sinesp">(sin {ESP_LBL}: {clp(v-cuotaEspProj)})</span>:null;
-  const espByAcc=fijosView.reduce((o,f)=>{const k=ACC[f.cuenta]?f.cuenta:"—";o[k]=(o[k]||0)+f.monto;return o;},{});
+  // Balance = cobros del ciclo incluidos los excepcionales (OTEC + viajes); entre paréntesis, sin ellos
+  const balance=totCiclo+m.vacN;
+  const excTot=cuotaEspProj+m.vacN;
+  const sinExc=balance-excTot;
+  const esHoy=ciclo===CICLO_HOY;
+  const fin=new Date(ciclo+"-20T00:00:00"), hoyD=new Date(HOY+"T00:00:00");
+  const faltan=Math.max(0,Math.round((fin-hoyD)/864e5));
+  const ini=cycStart(ciclo);
+  const dTot=Math.round((fin-new Date(ini+"T00:00:00"))/864e5)+1;
+  const dTr=Math.max(1,Math.min(dTot,Math.round((hoyD-new Date(ini+"T00:00:00"))/864e5)+1));
+  const totProj=Math.round(m.consN*dTot/dTr)+fijoProj+cuotaProj;
+  const delta=sueldo-(totProj-cuotaEspProj);
+  const segBase=Math.max(1,m.consN+cuotaProj+fijoProj);
+  const otecTx=rows0.find(t=>cycleTx(t)===ciclo&&t.cuota&&esEsp(t));
+  const otecIt=cuotasView.items.find(t=>t.esp&&t.activa&&!t.futura);
+  const otec=esHoy&&otecIt?{n:otecIt.nAct,de:otecIt.cuota.de}:(otecTx?{n:otecTx.cuota.n,de:otecTx.cuota.de}:null);
+
+  // carrusel de ciclos
+  const prevC=cycleAdd(ciclo,-1), nextC=cycleAdd(ciclo,1);
+  const cards=[];
+  if(ciclosL.includes(prevC)) cards.push({k:"prev",c:prevC});
+  cards.push({k:"cur",c:ciclo});
+  if(ciclo<CICLO_HOY&&ciclosL.includes(nextC)) cards.push({k:"next",c:nextC});
+  else if(esHoy&&cuotasView.proy[1]) cards.push({k:"proj",c:nextC});
+  const curIdx=cards.findIndex(x=>x.k==="cur");
+  const onCarScroll=()=>{ clearTimeout(carT.current); carT.current=setTimeout(()=>{
+    const el=carRef.current; if(!el) return; const mid=el.scrollLeft+el.clientWidth/2;
+    let best=-1,bd=1e9; [...el.children].forEach((ch,i)=>{const d=Math.abs(ch.offsetLeft+ch.clientWidth/2-mid); if(d<bd){bd=d;best=i;}});
+    const x=cards[best]; if(x&&(x.k==="prev"||x.k==="next")) setCiclo(x.c);
+  },160); };
+
+  // movimientos agrupados por día
+  const vis=rows.slice(0,nVer);
+  const grupos=[]; vis.forEach(t=>{ let g=grupos[grupos.length-1]; if(!g||g.f!==t.fecha){ g={f:t.fecha,items:[]}; grupos.push(g);} g.items.push(t); });
+  const totDia=f=>rows.filter(t=>t.fecha===f&&t.flow==="out"&&!t.excl).reduce((a,t)=>a+t.monto,0);
+  const kindOf=t=>t.excl?"excl":t.flow==="in"?"in":bucketOf(t);
+  const irA=(tipo)=>{ setTab("wallet"); setFTipo(tipo); setTimeout(()=>{ if(listRef.current) listRef.current.scrollIntoView({behavior:"smooth",block:"start"}); },50); };
+  const selTx=sel?txById(sel):null;
+
+  const TxRow=({t})=>{ const k=kindOf(t), s=BKS[k]; return(
+    <div className={"row tap"+(t.excl?" excl":"")} onClick={()=>setSel(t.id)} role="button" tabIndex={0} onKeyDown={e=>{if(e.key==="Enter")setSel(t.id);}}>
+      <div className="ic" style={{background:s.bg,color:s.fg}}>{(t.comercio.replace(/^[A-Z]+\s*\*/,"").trim().charAt(0)||"·").toUpperCase()}</div>
+      <div className="mid">
+        <span className="nm">{t.comercio}</span>
+        <span className="sub">{catOf(t)} · {ACC[t.cuenta]?ACC[t.cuenta].s:t.cuenta}
+          {t.cuota&&<span className={"tag "+(esEsp(t)?"t-exc":"t-cuo")}>Cuota {t.cuota.n}/{t.cuota.de}{esEsp(t)?" · Excepcional":""}</span>}
+          {k==="fijo"&&!t.cuota&&<span className="tag t-fij">Fijo</span>}
+          {k==="vac"&&<span className="tag t-exc">{t.viaje?"Viaje "+t.viaje:"Viaje"}</span>}
+          {t.moneda==="USD-bill"&&<span>{usd(t.monto_orig)}</span>}
+        </span>
+      </div>
+      <span className="amt" style={{color:t.flow==="in"?"var(--save)":"var(--ink)"}}>{t.flow==="in"?"+":""}{clp(t.monto)}</span>
+    </div>);};
 
   return (<div className="wrap">
    <style>{CSS}</style>
    <div className="main">
+    {needKey && <div className="alert">Ingresa el token del Apps Script (sale en el registro de <b>configurarV6</b>) para ver tus datos.
+      <div style={{display:"flex",gap:8,marginTop:10}}><input className="inp" aria-label="Token" value={keyIn} onChange={e=>setKeyIn(e.target.value)} placeholder="token" autoCapitalize="off" autoCorrect="off"/><button className="btn" onClick={guardarToken}>Guardar</button></div></div>}
+    {diasSin>2&&<div className="alert">Último movimiento registrado: <b>{fdate(dataMax)}</b>, hace {diasSin} días. Faltan correos por procesar.</div>}
+
+    {tab==="wallet" && <>
     <div className="hdr">
-      <div><div className="eyebrow">Control de flujo personal</div><h1 className="h1">Mis finanzas</h1>
-        <div className="chip" style={{marginTop:3}}>build {BUILD} · datos al {fdate(dataMax)} · fuente {fuente}{sync&&<> · {sync}</>}</div></div>
-      <div className="reserva"><span>🔒</span><span>Fondo a invertir (no disponible): <b className="num">{clp(RESERVA_CHL)}</b></span></div>
+      <div><div className="d">{FECHA_HOY}</div><h1 className="h1">Mis finanzas</h1></div>
+      <button className={"ibtn"+(buscar?" on":"")} aria-label="Buscar movimiento" aria-pressed={buscar} onClick={()=>{setBuscar(!buscar); if(!buscar) setTimeout(()=>listRef.current&&listRef.current.scrollIntoView({behavior:"smooth",block:"start"}),50);}}>{Ico.buscar}</button>
     </div>
-    {needKey && <div className="aside" style={{marginBottom:12}}>🔑 Ingresa el token del Apps Script (sale en el registro de <b>configurarV6</b>) para ver tus datos:
-      <div style={{display:"flex",gap:8,marginTop:8}}><input className="search" style={{flex:1}} value={keyIn} onChange={e=>setKeyIn(e.target.value)} placeholder="token" autoCapitalize="off" autoCorrect="off"/><button onClick={guardarToken}>Guardar</button></div></div>}
-    <div className="tabs">
-      <button className={tab==="periodo"?"on":""} onClick={()=>setTab("periodo")}>Resumen</button>
-      <button className={tab==="consumo"?"on":""} onClick={()=>setTab("consumo")}>Consumo</button>
-      <button className={tab==="fijos"?"on":""} onClick={()=>setTab("fijos")}>Fijos</button>
-      <button className={tab==="cuotas"?"on":""} onClick={()=>setTab("cuotas")}>Cuotas</button>
-      <button className={tab==="meses"?"on":""} onClick={()=>setTab("meses")}>Meses</button>
-    </div>
-    {diasSin>2&&<div className="aside" style={{marginTop:10}}>⚠ Última transacción registrada: <b className="num">{fdate(dataMax)}</b> — hace {diasSin} días. Hay que procesar las notificaciones de Gmail nuevas (pídeselo a Claude).</div>}
 
-    {tab==="periodo" && <>
-    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"12px 0 0"}}>
-      <span className="chip">Ciclo facturación BdC</span>
-      <select className="filt" value={ciclo} onChange={e=>setCiclo(e.target.value)} style={{padding:"5px 8px",fontSize:12}}>
-        {ciclosL.map(c=><option key={c} value={c}>{cycleLabel(c)+(c===CICLO_HOY?" · ciclo en curso":"")}</option>)}
-      </select>
-      {ciclo===CICLO_HOY&&<span className="chip" style={{color:"var(--save)",fontWeight:600}}>en curso · día {Math.round((new Date(HOY)-new Date(cycStart(ciclo)))/864e5)+1} del ciclo</span>}
-      {!info&&<span className="chip">sin estado de cuenta aún — cifras provisorias desde notificaciones</span>}
+    <div className="car" ref={carRef} onScroll={onCarScroll}>
+      {cards.map(x=>{
+        if(x.k==="cur") return (
+        <div key={x.k} ref={curRef} className="wc cur">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
+            <span className="k">{mesLargo(x.c)} · {esHoy?"en curso":"cerrado"}</span>
+            {esHoy&&<span className="tag" style={{background:"#FF9F5A",color:"#14213D"}}>Faltan {faltan} días</span>}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:2}}>
+            <span className="big">{clp(balance)}</span>
+            {excTot>0&&<span className="s">(sin excepcionales {clp(sinExc)})</span>}
+          </div>
+          <div className="seg3" role="img" aria-label={"Directas "+clp(m.consN)+", cuotas "+clp(cuotaProj)+", fijos "+clp(fijoProj)}>
+            <i style={{width:(m.consN/segBase*100)+"%",background:"#FF9F5A"}}/><i style={{width:(cuotaProj/segBase*100)+"%",background:"#7FB0FF"}}/><i style={{width:(fijoProj/segBase*100)+"%",background:"#E8EDF7"}}/>
+          </div>
+        </div>);
+        if(x.k==="proj"){ const p=cuotasView.proy[1]; return (
+        <div key={x.k} className="wc proj">
+          <span className="k">{mesLargo(x.c)} · proyectado</span>
+          <span className="big" style={{fontSize:30}}>{clp(p.monto+totEsp)}</span>
+          <span className="s">Cuotas {clp(p.monto)}{p.espM>0?" (sin "+ESP_LBL+" "+clp(p.monto-p.espM)+")":""} + fijos {clp(totEsp)}. No incluye compras directas.</span>
+        </div>);}
+        const tt=totCicloTx(x.c); const ci=CICLO_INFO[x.c];
+        return (
+        <button key={x.k} className="wc past" onClick={()=>setCiclo(x.c)} aria-label={"Ver ciclo "+mesLargo(x.c)}>
+          <span className="k">{mesLargo(x.c)} · {x.c===CICLO_HOY?"en curso · a la fecha":(ci&&ci.bdc?"facturado":"cerrado")}</span>
+          <span className="big" style={{fontSize:30}}>{clp(ci&&ci.bdc?ci.bdc.pagar+((ci.stg&&ci.stg.pagar)||0):tt.tot)}</span>
+          <span className="s">{tt.exc>0?"(sin excepcionales "+clp(tt.tot-tt.exc)+")":"Toca para ver el detalle"}</span>
+        </button>);
+      })}
     </div>
-    <div className="cardgrid" style={{marginTop:10}}>
-      <div className="card tap" onClick={e=>{if(e.target.tagName!=="INPUT")setTab("consumo");}} style={{background:COL.cons+"10",borderColor:COL.cons+"33"}}>
-        <div className="lbl">Consumo del mes <span className="chip">(sin cuotas ni fijos)</span></div>
-        <div className="big num" style={{color:COL.cons}}>{clp(m.consN)}</div>
-        <div className="sub">meta <span className="editbox"><span style={{color:"var(--muted)"}}>$</span>
-          <input className="num" type="number" step="50000" value={meta} onChange={e=>saveMeta(Math.max(0,parseInt(e.target.value||"0")))}/></span>
-          {restante>=0 ? <> · sobran <b className="num" style={{color:"var(--save)"}}>{clp(restante)}</b></>
-                       : <> · <b style={{color:COL.cons}}>{clp(-restante)} sobre la meta</b></>}
+    <div className="dots" aria-hidden="true">{cards.map((x,i)=><i key={i} className={i===curIdx?"on":""}/>)}<span>{cards.map(x=>MESN[Number(x.c.slice(5))-1]).join(" · ")}</span></div>
+    {!esHoy&&<button className="btn sec2" onClick={()=>setCiclo(CICLO_HOY)}>Volver al ciclo en curso</button>}
+
+    <div className="tiles">
+      <button className="tile" onClick={()=>irA("cons")}><span className="dot" style={{background:"#FF9F5A"}}/><span className="l">Directas</span><span className="v">{clp(m.consN)}</span>
+        <span className="x" style={{color:restante<0?"var(--warn)":"var(--muted)"}}>{restante>=0?"quedan "+kfmt(restante):kfmt(-restante)+" sobre meta"}</span></button>
+      <button className="tile" onClick={()=>setTab("cuotas")}><span className="dot" style={{background:"#7FB0FF"}}/><span className="l">Cuotas del mes</span><span className="v">{clp(cuotaProj)}</span>
+        <span className="x">{cuotaEspProj>0?"sin "+ESP_LBL+" "+kfmt(cuotaProj-cuotaEspProj):"ver escalera"}</span></button>
+      <button className="tile" onClick={()=>setTab("fijos")}><span className="dot" style={{background:"#C3CBDB"}}/><span className="l">Fijos</span><span className="v">{clp(fijoProj)}</span>
+        <span className="x">{esHoy?"pendiente "+kfmt(Math.max(0,fijoProj-m.fijo)):"del ciclo"}</span></button>
+    </div>
+
+    {excTot>0&&<div className="list" style={{padding:"4px 16px"}}>
+      {cuotaEspProj>0&&<div className="row" style={{minHeight:56}}><span className="tag t-exc">Excepcional</span><span className="nm" style={{flex:1,fontSize:15,fontWeight:600}}>{ESP_LBL}{otec?" · cuota "+otec.n+"/"+otec.de:""}</span><span className="amt">{clp(cuotaEspProj)}</span></div>}
+      {m.vacN>0&&<div className="row tap" style={{minHeight:56}} onClick={()=>irA("vac")}><span className="tag t-exc">Excepcional</span><span className="nm" style={{flex:1,fontSize:15,fontWeight:600}}>{m.viajes.length?"Viaje "+m.viajes.join(", "):"Viajes"}</span><span className="amt">{clp(m.vacN)}</span></div>}
+    </div>}
+
+    {esHoy&&<div className="strip">
+      <div><div className="k">Proyección al cierre · día {dTr} de {dTot}</div><div className="v">{clp(totProj)}</div></div>
+      <div style={{textAlign:"right"}}><div className="k">vs sueldo{cuotaEspProj>0?" (sin "+ESP_LBL+")":""}</div><div className="v" style={{color:delta>=0?"var(--save)":"var(--warn)"}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</div></div>
+    </div>}
+
+    <div ref={listRef} style={{display:"flex",flexDirection:"column",gap:12,scrollMarginTop:16}}>
+      <div className="sec"><span>Movimientos</span><span className="r">{rows.length}</span></div>
+      <div className="segc" role="group" aria-label="Filtrar movimientos">
+        {[["todo","Todo"],["cons","Directas"],["cuota","Cuotas"],["fijo","Fijos"],["vac","Viajes"]].map(([k,l])=>
+          <button key={k} className={fTipo===k?"on":""} aria-pressed={fTipo===k} onClick={()=>setFTipo(k)}>{l}</button>)}
+      </div>
+      {buscar&&<div className="box" style={{padding:14,display:"flex",flexDirection:"column",gap:10}}>
+        <input className="inp" aria-label="Buscar comercio" placeholder="Buscar comercio o ciudad…" value={q} onChange={e=>setQ(e.target.value)} autoFocus/>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <select className="inp" aria-label="Cuenta" value={fAcc} onChange={e=>setFAcc(e.target.value)}><option value="todas">Todas las cuentas</option>{Object.entries(ACC).map(([k,v])=><option key={k} value={k}>{v.s}</option>)}</select>
+          <select className="inp" aria-label="Categoría" value={fCat} onChange={e=>setFCat(e.target.value)}><option value="todas">Todas las categorías</option>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
         </div>
-      </div>
-      <div className="card tap" onClick={()=>setTab("fijos")} style={{background:COL.fijo+"10",borderColor:COL.fijo+"33"}}>
-        <div className="lbl">Gastos fijos mes {ciclo===CICLO_HOY&&<span className="chip">(base esperada)</span>}</div>
-        <div className="big num" style={{color:COL.fijo}}>{clp(fijoProj)}</div>
-        <div className="sub">{ciclo===CICLO_HOY?<>cargado {clp(m.fijo)} · pendiente {clp(Math.max(0,fijoProj-m.fijo))}</>:<>suscripciones, seguros, CAE, comisiones y lista maestra</>}</div>
-      </div>
-      <div className="card tap" onClick={()=>setTab("cuotas")} style={{background:COL.cuota+"10",borderColor:COL.cuota+"33"}}>
-        <div className="lbl">Cuotas mes {ciclo===CICLO_HOY&&<span className="chip">(proyectado)</span>}</div>
-        <div className="big num" style={{color:COL.cuota}}>{clp(cuotaProj)}</div>
-        {sinEsp(cuotaProj)}
-        <div className="sub">{ciclo===CICLO_HOY?<>cargado a la fecha {clp(m.cuota)} · detalle en pestaña Cuotas</>:<>todas las cuotas del ciclo · detalle en pestaña Cuotas</>}</div>
-      </div>
-      <div className="card">
-        <div className="lbl">Total del ciclo {ciclo===CICLO_HOY&&<span className="chip">(base esperada)</span>}</div>
-        <div className="big num">{clp(totCiclo)}</div>
-        {sinEsp(totCiclo)}
-        <div className="sub">sin cuotas <b className="num">{clp(sinCuotas)}</b> · cuotas <b className="num">{clp(cuotaProj)}</b>
-          {info&&info.bdc&&<><br/>facturado: {clp(info.bdc.pagar+((info.stg&&info.stg.pagar)||0))}{info.bdc.intl?" + "+usd(info.bdc.intl):""}</>}</div>
-      </div>
+        <label style={{display:"flex",gap:8,alignItems:"center",fontSize:13,color:"var(--muted2)"}}><input type="checkbox" checked={showExcl} onChange={e=>setShowExcl(e.target.checked)}/> Mostrar pagos de tarjeta y traspasos</label>
+      </div>}
+      {dupCands>0&&<div className="alert">{dupCands} posibles duplicados (misma fecha, cuenta y monto). Revísalos.</div>}
+      {grupos.length===0&&<div className="box" style={{padding:16,color:"var(--muted)",fontSize:14}}>Sin movimientos con este filtro.</div>}
+      {grupos.map(g=>(<div key={g.f} style={{display:"flex",flexDirection:"column",gap:6}}>
+        <div className="sec"><span>{diaLbl(g.f)}</span><span className="r">{totDia(g.f)>0?clp(totDia(g.f)):""}</span></div>
+        <div className="list">{g.items.map(t=><TxRow key={t.id} t={t}/>)}</div>
+      </div>))}
+      {rows.length>nVer&&<button className="btn sec2" onClick={()=>setNVer(nVer+25)}>Ver más ({rows.length-nVer})</button>}
     </div>
-
-    {ciclo===CICLO_HOY&&(()=>{
-      const ini=cycStart(ciclo);
-      const dTot=Math.round((new Date(ciclo+"-20")-new Date(ini))/864e5)+1;
-      const dTr=Math.max(1,Math.min(dTot,Math.round((new Date(HOY)-new Date(ini))/864e5)+1));
-      const totProj=Math.round(m.consN*dTot/dTr)+fijoProj+cuotaProj;
-      const delta=sueldo-(totProj-cuotaEspProj);
-      return(<div className="panel tap" onClick={()=>setTab("consumo")} style={{marginTop:12,padding:"13px 16px",display:"flex",justifyContent:"space-between",alignItems:"center",gap:10,flexWrap:"wrap"}}>
-        <div><div className="k">Proyección al cierre (día {dTr} de {dTot})</div><div className="num" style={{fontSize:18,fontWeight:700}}>{clp(totProj)}</div></div>
-        <div style={{textAlign:"right"}}><div className="k">vs sueldo{cuotaEspProj>0?" (sin "+ESP_LBL+")":""}</div><div className="num" style={{fontSize:18,fontWeight:700,color:delta>=0?"var(--save)":COL.cons}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</div></div>
-      </div>);})()}
-    {m.vacN>0&&<div className="aside">✈ Vacaciones/viajes aparte: <b className="num">{clp(m.vacN)}</b>{m.viajes.length?" ("+m.viajes.join(", ")+")":""}</div>}
-    <div className="chip" style={{marginTop:10}}>Toca una tarjeta para ver el detalle.</div>
     </>}
 
-    {tab==="consumo" && <>
-    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"12px 0 0"}}>
-      <span className="chip">Ciclo facturación BdC</span>
-      <select className="filt" value={ciclo} onChange={e=>setCiclo(e.target.value)} style={{padding:"5px 8px",fontSize:12}}>
-        {ciclosL.map(c=><option key={c} value={c}>{cycleLabel(c)+(c===CICLO_HOY?" · ciclo en curso":"")}</option>)}
-      </select>
-      {ciclo===CICLO_HOY&&<span className="chip" style={{color:"var(--save)",fontWeight:600}}>en curso · día {Math.round((new Date(HOY)-new Date(cycStart(ciclo)))/864e5)+1} del ciclo</span>}
-      {!info&&<span className="chip">sin estado de cuenta aún — cifras provisorias desde notificaciones</span>}
-    </div>
-    <div className="panel" style={{marginTop:13,padding:"15px 18px"}}>
-      <div className="sectitle">Composición del gasto del período · {clp(totBar)}</div>
-      <div className="stackbar">
-        <i style={{width:(m.consN/totBar*100)+"%",background:COL.cons}}/>
-        <i style={{width:(m.fijo/totBar*100)+"%",background:COL.fijo}}/>
-        <i style={{width:(m.cuota/totBar*100)+"%",background:COL.cuota}}/>
+    {tab==="cuotas" && (()=>{
+      const P=cuotasView.proy.slice(0,12);
+      const maxP=Math.max(1,...P.map(p=>p.monto));
+      const pico=P.reduce((a,p)=>p.monto>a.monto?p:a,{monto:0,c:null});
+      const act=cuotasView.items.filter(t=>t.activa), pag=cuotasView.items.filter(t=>!t.activa);
+      return(<>
+      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+        <span style={{fontSize:13,color:"var(--muted)"}}>Ciclo {mesNom(CICLO_HOY)} · {act.length} compras activas</span>
+        <h1 className="h1">Cuotas</h1>
       </div>
-      <div className="lg">
-        <div className="it"><span className="dot" style={{background:COL.cons}}/>Consumo del mes <b className="num">{clp(m.consN)}</b></div>
-        <div className="it"><span className="dot" style={{background:COL.fijo}}/>Gastos fijos mes <b className="num">{clp(m.fijo)}</b></div>
-        <div className="it"><span className="dot" style={{background:COL.cuota}}/>Cuotas mes <b className="num">{clp(m.cuota)}</b></div>
+      <div className="navy">
+        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+          <span className="k">Se cobra en cuotas este mes</span>
+          <span className="big">{clp(cuotasView.carga)}</span>
+          {cuotasView.cargaEsp>0&&<span style={{fontSize:14,color:"#B9C2D6"}}>(sin {ESP_LBL} {clp(cuotasView.carga-cuotasView.cargaEsp)})</span>}
+        </div>
+        <div className="g2">
+          <div><div className="k">Pico próximos 12 meses</div><div className="v">{pico.c?clp(pico.monto)+" · "+MESN[Number(pico.c.slice(5))-1]:"—"}</div></div>
+          <div><div className="k">Todo pagado en</div><div className="v">{cuotasView.fin?mesNom(cuotasView.fin):"—"}</div></div>
+        </div>
       </div>
-      {m.vacN>0 && <div className="aside">✈ Gasto extraordinario marcado como vacaciones{m.viajes.length?" ("+m.viajes.map(v=>"viaje "+v).join(", ")+")":""}: <b className="num">{clp(m.vacN)}</b> — financiado con ahorro, no incluido arriba (aplica solo a meses atípicos).</div>}
-    </div>
+      {P.length>0&&<div className="box" style={{padding:16,display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:15,fontWeight:700}}>Próximos {P.length} ciclos</span><span style={{fontSize:12,color:"var(--muted)"}}>miles de $</span></div>
+        <div className="chart" role="img" aria-label={"Cobro en cuotas por ciclo: "+P.map(p=>mesNom(p.c)+" "+clp(p.monto)).join(", ")} style={{gridTemplateColumns:"repeat("+P.length+",minmax(0,1fr))"}}>
+          {P.map((p,i)=>(<div key={p.c} className="col">
+            <span className="kk">{Math.round(p.monto/1000)}</span>
+            <div className="bars">{[...p.act].reverse().map(t=><i key={t.id} style={{height:Math.max(2,t.cuota.valor/maxP*140)+"px",background:t.color}}/>)}</div>
+            <span className={"m"+(i===0?" on":"")}>{MESN[Number(p.c.slice(5))-1].charAt(0).toUpperCase()}</span>
+          </div>))}
+        </div>
+      </div>}
+      {act.map(t=>(<div key={t.id} className="qc">
+        <div className="t"><span className="sq" style={{background:t.color}}/><span className="n">{t.comercio}</span><span className="v">{clp(t.cuota.valor)}/mes</span></div>
+        <div className="pb"><i style={{width:Math.max(2,(t.futura?0:t.nAct/t.cuota.de)*100)+"%",background:t.color}}/></div>
+        <div className="f"><span>{t.futura?"Aún sin cobrar · "+t.cuota.de+" cuotas":"Cuota "+t.nAct+" de "+t.cuota.de+(t.estimado?" (est.)":"")+" · quedan "+(t.cuota.de-t.nAct)}</span>
+          <span>{t.futura?"1ª: "+mesNom(t.ciclo||cycleOf(t.fecha)):"Última: "+mesNom(t.ultimo)}</span></div>
+        {(t.esp||/^manual/.test(t.id))&&<span className={"tag "+(t.esp?"t-exc":"t-fij")} style={{alignSelf:"flex-start"}}>{t.esp?"Excepcional · se paga aparte":"Cargada a mano"}</span>}
+      </div>))}
+      <div className="kv"><span>Saldo en cuotas (incluye este mes)</span><b>{clp(cuotasView.totPend)}</b></div>
+      {pag.length>0&&<button className="btn ghost" onClick={()=>setVerPagadas(!verPagadas)}>{verPagadas?"Ocultar":"Ver"} cuotas pagadas ({pag.length})</button>}
+      {verPagadas&&<div className="list">{pag.map(t=>(<div key={t.id} className="row"><div className="mid"><span className="nm">{t.comercio}</span><span className="sub">{t.cuota.de} cuotas de {clp(t.cuota.valor)}</span></div><span className="tag t-in">Pagada</span></div>))}</div>}
+      {cuotasView.items.some(t=>t.estimado&&t.activa)&&<div style={{fontSize:12,color:"var(--muted)",padding:"0 4px"}}>(est.): cuota avanzada automáticamente desde el último estado de cuenta conciliado.</div>}
+      </>);})()}
 
-    {ciclo===CICLO_HOY&&(()=>{
-      const ini=cycStart(ciclo);
-      const dTot=Math.round((new Date(ciclo+"-20")-new Date(ini))/864e5)+1;
-      const dTr=Math.max(1,Math.min(dTot,Math.round((new Date(HOY)-new Date(ini))/864e5)+1));
-      const consProj=Math.round(m.consN*dTot/dTr);
-      const totHoy=m.consN+m.fijo+m.cuota;
-      const totProj=consProj+fijoProj+cuotaProj;
-      const totProjSueldo=totProj-cuotaEspProj;
-      const delta=sueldo-totProjSueldo;
-      return(
-      <div className="panel" style={{marginTop:13,padding:"15px 18px"}}>
-        <div className="sectitle">Proyección fin de ciclo <span className="chip">día {dTr} de {dTot} · consumo a ritmo actual · fijos y cuotas según base</span></div>
+    {tab==="fijos" && (()=>{
+      const cats=Object.entries(fijosView.reduce((o,f)=>{(o[f.categoria||"Otros"]=o[f.categoria||"Otros"]||[]).push(f);return o;},{}))
+        .map(([c,l])=>({c,l,tot:l.reduce((x,f)=>x+f.monto,0)})).sort((a,b)=>b.tot-a.tot).map((x,i)=>({...x,color:FPAL[i%FPAL.length]}));
+      const T=Math.max(1,totEsp);
+      return(<>
+      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+        <span style={{fontSize:13,color:"var(--muted)"}}>Ciclo {mesNom(ciclo)}{esHoy?" · en curso":""} · {fijosView.length} cobros</span>
+        <h1 className="h1">Fijos</h1>
+      </div>
+      <div className="box" style={{padding:18,display:"flex",flexDirection:"column",gap:12}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}><span style={{fontSize:14,color:"var(--muted)"}}>Esperado del ciclo</span><span style={{fontSize:30,fontWeight:800,letterSpacing:"-.02em"}}>{clp(totEsp)}</span></div>
+        <div className="seg3" style={{height:10}}>{cats.map(x=><i key={x.c} style={{width:(x.tot/T*100)+"%",background:x.color}}/>)}</div>
+        <div className="lg">{cats.map(x=><span key={x.c}><span className="sq" style={{background:x.color}}/>{x.c} · {Math.round(x.tot/T*100)} %</span>)}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,borderTop:"1px solid var(--line)",paddingTop:12}}>
+          <div><div style={{fontSize:12,color:"var(--muted)"}}>Pagado</div><div style={{fontSize:16,fontWeight:800,color:"var(--save)"}}>{clp(totPag)}</div></div>
+          <div><div style={{fontSize:12,color:"var(--muted)"}}>Pendiente</div><div style={{fontSize:16,fontWeight:800,color:totPend>0?"var(--warn)":"var(--muted)"}}>{clp(totPend)}</div></div>
+        </div>
+      </div>
+      {cats.map(x=>(<div key={x.c} style={{display:"flex",flexDirection:"column",gap:8}}>
+        <div className="sec"><span style={{display:"flex",alignItems:"center",gap:8}}><span className="sq" style={{background:x.color}}/>{x.c}</span><span className="r" style={{fontWeight:800,color:"var(--ink)"}}>{clp(x.tot)}</span></div>
+        <div className="list">{x.l.map(f=>(<div key={f.nombre} className="row">
+          <button className={"chk"+(f.pagado?" on":"")} disabled={!!f.tx} aria-pressed={f.pagado} aria-label={(f.pagado?"Pagado: ":"Marcar pagado: ")+f.nombre} onClick={()=>toggleFijo(f.nombre)}>{f.pagado&&Ico.check}</button>
+          <div className="mid"><span className="nm">{f.nombre}</span>
+            <span className="sub">{f.tx?"Pagado el "+fdate(f.tx.fecha):(f.manual?"Marcado a mano":(f.atrasado?<span className="tag t-warn">Atrasado · se esperaba el {fdate(f.fEsp)}</span>:"Esperado el "+fdate(f.fEsp)))}{f.cuenta&&ACC[f.cuenta]?" · "+ACC[f.cuenta].s:""}</span></div>
+          <div style={{textAlign:"right"}}><div className="amt" style={{color:f.pagado?"var(--save)":"var(--ink)"}}>{clp(f.montoReal)}</div>
+            {f.tx&&f.tx.monto!==f.monto&&<div style={{fontSize:11,color:"var(--muted)"}}>esperado {clp(f.monto)}</div>}</div>
+        </div>))}</div>
+      </div>))}
+      <div style={{fontSize:12,color:"var(--muted)",lineHeight:1.55,padding:"0 4px"}}>El ✓ es automático cuando llega el cargo del ciclo. Usa el círculo para pagos hechos por fuera. La lista se edita en tu Google Sheet ({fuenteFijos}).</div>
+      </>);})()}
+
+    {tab==="mas" && <>
+      <div style={{display:"flex",flexDirection:"column",gap:2}}>
+        <span style={{fontSize:13,color:"var(--muted)"}}>Todo cambio queda registrado</span>
+        <h1 className="h1">Más</h1>
+      </div>
+
+      <div className="sec"><span>Metas</span></div>
+      <div className="list">
+        <div className="row"><div className="mid"><span className="nm">Meta de compras directas</span><span className="sub">{restante>=0?"Sobran "+clp(restante):clp(-restante)+" sobre la meta"} · a ahorro {clp(ahorroBase)}</span></div>
+          <input className="inp" style={{width:130,textAlign:"right"}} aria-label="Meta de compras directas" type="number" inputMode="numeric" step="50000" value={meta} onChange={e=>saveMeta(Math.max(0,parseInt(e.target.value||"0")))}/></div>
+        <div className="row"><div className="mid"><span className="nm">Sueldo</span><span className="sub">Base de la proyección al cierre</span></div>
+          <input className="inp" style={{width:130,textAlign:"right"}} aria-label="Sueldo" type="number" inputMode="numeric" step="10000" value={sueldo} onChange={e=>saveSueldo(Math.max(0,parseInt(e.target.value||"0")))}/></div>
+      </div>
+
+      <div className="sec"><span>Excepcionales</span></div>
+      <div className="list">
+        <div className="row"><div className="mid"><span className="nm">{ESP_LBL} UATSA</span><span className="sub">Cuota que pagas aparte: va entre paréntesis en el balance</span></div><span className="tag t-exc">Siempre</span></div>
+        <div className="row"><div className="mid"><span className="nm">Viajes del ciclo</span><span className="sub">{m.viajes.length?m.viajes.join(", "):"Ninguno"} · para agregar uno, indícale a Claude nombre y fechas</span></div><span className="amt">{clp(m.vacN)}</span></div>
+      </div>
+
+      <div className="sec"><span>Análisis del ciclo</span><span className="r">{mesNom(ciclo)}</span></div>
+      <div className="box" style={{padding:16,display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+        <div style={{width:150,height:150,position:"relative",flex:"none"}}>
+          <ResponsiveContainer width="100%" height="100%"><PieChart>
+            <Pie data={m.donut.map(([n,v])=>({name:n,value:v}))} dataKey="value" cx="50%" cy="50%" innerRadius={48} outerRadius={72} stroke="none" paddingAngle={1}>
+              {m.donut.map(([n],i)=><Cell key={i} fill={n==="Cuotas mes"?"#7FB0FF":n==="Gastos fijos mes"?"#C3CBDB":PAL[i%PAL.length]}/>)}
+            </Pie></PieChart></ResponsiveContainer>
+          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
+            <span style={{fontSize:11,color:"var(--muted)"}}>total</span><span style={{fontWeight:800,fontSize:13}}>{clp(totalDona)}</span></div>
+        </div>
+        <div style={{flex:"1 1 160px",display:"flex",flexDirection:"column",gap:6}}>
+          {m.donut.map(([n,v],i)=>(<div key={n} style={{display:"flex",alignItems:"center",gap:8,fontSize:12}}>
+            <span className="sq" style={{background:n==="Cuotas mes"?"#7FB0FF":n==="Gastos fijos mes"?"#C3CBDB":PAL[i%PAL.length]}}/><span style={{flex:1}}>{n}</span>
+            <b>{clp(v)}</b><span style={{width:34,textAlign:"right",color:"var(--muted)"}}>{Math.round(v/Math.max(1,totalDona)*100)}%</span></div>))}
+        </div>
+      </div>
+      <div className="list">
+        {Object.entries(BANKS).map(([k,b])=>{const gast=k==="STG"?m.gastSTG:m.gastCHL;const bi=info?(k==="STG"?info.stg:info.bdc):null;return(
+          <div key={k} className="row"><span className="sq" style={{background:b.color}}/><div className="mid"><span className="nm">{b.label}</span>
+            <span className="sub">{bi?"A pagar "+clp(bi.pagar)+(bi.intl?" + "+usd(bi.intl):"")+" · vence "+bi.vence:"Sin estado de cuenta del ciclo"}</span></div>
+            <div style={{textAlign:"right"}}><div style={{fontSize:11,color:"var(--muted)"}}>Gastado</div><div className="amt">{clp(gast)}</div></div></div>);})}
+        <div className="row"><div className="mid"><span className="nm">Ahorro extra · 50 % MetLife</span><span className="sub">No lo cuentas, pero acumula</span></div><span className="amt">{clp(m.metX)}</span></div>
+        <div className="row"><div className="mid"><span className="nm">Fondo a invertir</span><span className="sub">No disponible para gasto</span></div><span className="amt">{clp(RESERVA_CHL)}</span></div>
+      </div>
+
+      <div className="sec"><span>Historial mensual</span></div>
+      <div className="box" style={{padding:16}}>
+        <div style={{width:"100%",height:200}}>
+          <ResponsiveContainer><BarChart data={MESES.map(x=>({mes:x.mes,"Banco de Chile":x.bdcTC,"Santander":x.stgTC}))} margin={{top:6,right:4,left:0,bottom:0}}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F7" vertical={false}/>
+            <XAxis dataKey="mes" tick={{fontSize:12,fill:"#5B6170"}} axisLine={false} tickLine={false}/>
+            <YAxis tickFormatter={clpK} tick={{fontSize:11,fill:"#5B6170"}} axisLine={false} tickLine={false} width={46}/>
+            <Tooltip formatter={v=>clp(v)} labelStyle={{fontWeight:700}}/>
+            <Legend wrapperStyle={{fontSize:12}}/>
+            <Bar dataKey="Banco de Chile" stackId="a" fill="#1F4FBF"/>
+            <Bar dataKey="Santander" stackId="a" fill="#7FB0FF" radius={[4,4,0,0]}/>
+          </BarChart></ResponsiveContainer>
+        </div>
         <div style={{overflow:"auto",marginTop:10}}>
-        <table className="mtab" style={{minWidth:420}}>
-          <thead><tr><th>Concepto</th><th className="rt">A la fecha</th><th className="rt">Proyección cierre</th></tr></thead>
-          <tbody>
-            <tr><td>Consumo variable</td><td className="n">{clp(m.consN)}</td><td className="n">{clp(consProj)}</td></tr>
-            <tr><td>Gastos fijos <span className="chip">(base esperada)</span></td><td className="n">{clp(m.fijo)}</td><td className="n">{clp(fijoProj)}</td></tr>
-            <tr><td style={{fontWeight:600}}>Subtotal sin cuotas</td><td className="n" style={{fontWeight:600}}>{clp(m.consN+m.fijo)}</td><td className="n" style={{fontWeight:600}}>{clp(consProj+fijoProj)}</td></tr>
-            <tr><td>Cuotas <span className="chip">(base proyectada)</span></td><td className="n">{clp(m.cuota)}</td><td className="n">{clp(cuotaProj)}</td></tr>
-            <tr><td style={{fontWeight:700}}>Total ciclo</td><td className="n" style={{fontWeight:700}}>{clp(totHoy)}</td><td className="n" style={{fontWeight:700}}>{clp(totProj)}</td></tr>
-            {cuotaEspProj>0&&<tr><td>Total sin {ESP_LBL} <span className="chip">(cuota pagada aparte)</span></td><td className="n">{clp(totHoy-m.cuotaEsp)}</td><td className="n">{clp(totProjSueldo)}</td></tr>}
-          </tbody>
-        </table></div>
-        <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center",marginTop:12}}>
-          <span className="chip">Sueldo</span>
-          <span className="editbox"><span style={{color:"var(--muted)"}}>$</span><input className="num" type="number" step="10000" value={sueldo} onChange={e=>saveSueldo(Math.max(0,parseInt(e.target.value||"0")))}/></span>
-          <span className="chip">→ delta proyectado a fin de ciclo{cuotaEspProj>0?" (sin "+ESP_LBL+")":""}:</span>
-          <b className="num" style={{fontSize:16,color:delta>=0?"var(--save)":COL.cons}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</b>
-        </div>
-        {diasSin>2&&<div className="aside">⚠ Proyección con datos al {fdate(dataMax)} — el ritmo de consumo puede estar subestimado.</div>}
-      </div>);})()}
-
-    <div className="saverow">
-      <div className="savecard" style={{background:COL.save+"12",border:"1px solid "+COL.save+"33"}}>
-        <div className="k" style={{color:COL.save}}>A ahorro este período</div>
-        <div className="v num" style={{color:COL.save}}>{clp(ahorroBase)}</div>
-        <div className="chip">lo que sobra de la meta de consumo</div>
-      </div>
-      <div className="savecard" style={{background:"#F4FAEF",border:"1px solid #DCEFC9"}}>
-        <div className="k" style={{color:"#5E8A2E"}}>Ahorro extra · 50% MetLife</div>
-        <div className="v num" style={{color:"#5E8A2E"}}>{clp(m.metX)}</div>
-        <div className="chip">no lo cuentas, pero igual acumula</div>
-      </div>
-    </div>
-
-    <div className="grid2">
-      {Object.entries(BANKS).map(([k,b])=>{const gast=k==="STG"?m.gastSTG:m.gastCHL;const bi=info?(k==="STG"?info.stg:info.bdc):null;return(
-        <div key={k} className="bankcard"><div className="top" style={{background:b.color}}/>
-          <div className="body">
-            <div className="col"><div className="k" style={{color:b.color}}>{b.label}</div>
-              <div style={{marginTop:9}}><div className="k">Gastado período</div><div className="v num" style={{color:COL.cons}}>{clp(gast)}</div></div></div>
-            <div className="col rt"><div className="k">{bi?"A pagar · fact "+bi.fact+" · vence "+bi.vence:"A pagar (sin estado aún)"}</div>
-              <div className="v num" style={{color:b.color}}>{bi?clp(bi.pagar):"—"}</div>
-              {bi&&bi.intl&&<div className="chip num" style={{color:b.color}}>+ {usd(bi.intl)}</div>}</div>
-          </div></div>);})}
-    </div>
-
-    <div>
-      <div className="panel" style={{padding:"16px 18px",marginTop:13}}>
-        <div className="sectitle">Costo por categoría <span className="chip">consumo del mes en detalle · cuotas y fijos agrupados · sin vacaciones</span></div>
-        <div className="donutrow">
-          <div style={{width:160,height:160,position:"relative",flex:"none"}}>
-            <ResponsiveContainer width="100%" height="100%"><PieChart>
-              <Pie data={m.donut.map(([n,v])=>({name:n,value:v}))} dataKey="value" cx="50%" cy="50%" innerRadius={50} outerRadius={76} stroke="none" paddingAngle={1}>
-                {m.donut.map(([n],i)=><Cell key={i} fill={donutColor(n,i)}/>)}
-              </Pie></PieChart></ResponsiveContainer>
-            <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",pointerEvents:"none"}}>
-              <div className="chip">total</div><div className="num" style={{fontWeight:700,fontSize:12.5}}>{clp(totalDona)}</div></div>
-          </div>
-          <div className="legend" style={{flex:1}}>
-            {m.donut.map(([n,v],i)=>(<div className="row" key={n}>
-              <span className="dot" style={{background:donutColor(n,i)}}/><span className="nm">{n}</span>
-              <span className="num" style={{color:"var(--muted)"}}>{clp(v)}</span>
-              <span className="num chip" style={{width:36,textAlign:"right"}}>{Math.round(v/totalDona*100)}%</span></div>))}
-          </div>
+          <table className="mt"><thead><tr><th>Mes 2026</th><th>TC BdC</th><th>TC Stg</th><th>Total TC</th><th>Ahorro</th><th>Extra MetLife</th></tr></thead><tbody>
+            {MESES.map(x=>(<tr key={x.mes}><td style={{fontWeight:700}}>{x.mes}</td><td>{clp(x.bdcTC)}</td><td>{clp(x.stgTC)}</td><td style={{fontWeight:700}}>{clp(x.bdcTC+x.stgTC)}</td><td>{x.ahorro?clp(x.ahorro):"—"}</td><td>{clp(x.ahorroX)}</td></tr>))}
+          </tbody></table>
         </div>
       </div>
-    </div>
 
-    <div className="panel" style={{marginTop:13,padding:"14px 16px 4px"}}>
-      <div className="filters">
-        <div className="sectitle" style={{marginRight:"auto"}}>Transacciones <span className="chip">({rows.length}) · toca el tipo para marcar vacaciones</span></div>
-        <input className="search" placeholder="Buscar comercio…" value={q} onChange={e=>setQ(e.target.value)}/>
-        <select className="filt" value={fAcc} onChange={e=>setFAcc(e.target.value)}><option value="todas">Todas las cuentas</option>{Object.entries(ACC).map(([k,v])=><option key={k} value={k}>{v.s}</option>)}</select>
-        <select className="filt" value={fCat} onChange={e=>setFCat(e.target.value)}><option value="todas">Todas las categorías</option>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
-        <label className="chip" style={{display:"flex",gap:5,alignItems:"center"}}><input type="checkbox" checked={soloVar} onChange={e=>setSoloVar(e.target.checked)}/> <b>solo gasto variable</b> (sin fijos ni cuotas)</label>
-        <label className="chip" style={{display:"flex",gap:5,alignItems:"center"}}><input type="checkbox" checked={showExcl} onChange={e=>setShowExcl(e.target.checked)}/> ver pagos/traspasos</label>
-        <button className="btnx" onClick={exportOvr}>Exportar cambios</button>
-        {dupCands>0&&<span className="chip" style={{color:"#E08A3C",fontWeight:600}}>⚠ {dupCands} posibles duplicados (misma fecha/cuenta/monto) — revisar</span>}
+      <div className="sec"><span>Datos</span></div>
+      <div className="list">
+        <div className="row"><div className="mid"><span className="nm">Fuente</span><span className="sub">{fuente}{sync?" · "+sync:""}</span></div></div>
+        <div className="row"><div className="mid"><span className="nm">Datos al</span><span className="sub">{fdate(dataMax)} · build {BUILD}</span></div></div>
+        <div className="row"><div className="mid"><span className="nm">Token del Apps Script</span><span className="sub">{token?"Guardado en este equipo":"Sin token"}</span></div>
+          <button className="btn sec2" style={{padding:"8px 12px",fontSize:13}} onClick={()=>setNeedKey(true)}>Cambiar</button></div>
+        <div className="row"><div className="mid"><span className="nm">Exportar cambios</span><span className="sub">Categorías y viajes editados, en JSON</span></div>
+          <button className="btn sec2" style={{padding:"8px 12px",fontSize:13}} onClick={exportOvr}>Copiar</button></div>
       </div>
-      {mobile ? (
-      <div style={{overflow:"auto",maxHeight:520}}>
-        {rows.map(t=>{const edited=ovr[t.id]&&ovr[t.id]!==t.cat;const bk=t.excl?null:bucketOf(t);return(
-          <div key={t.id} className={"txcard"+(t.excl?" excl":"")+(bk==="vac"?" vac":"")}>
-            <div className="r1">
-              <span className="num">{fdate(t.fecha)}</span>
-              <span className="tag" style={{background:ACC[t.cuenta].c+"18",color:ACC[t.cuenta].c}}>{ACC[t.cuenta].s}</span>
-              {t.cuota&&<span className="chip">cuota {t.cuota.n}/{t.cuota.de}</span>}
-              <span className="amt num" style={{color:t.flow==="in"?"var(--save)":(t.excl?"#AEB3C0":"var(--ink)")}}>{t.flow==="in"?"+":"−"}{clp(t.monto)}</span>
-            </div>
-            <div className="mer">{t.comercio}{t.ciudad&&<span className="chip"> · {t.ciudad}</span>}{t.moneda==="USD-bill"&&<span className="chip num"> · {usd(t.monto_orig)}</span>}</div>
-            <div className="r3">
-              <select className={"cat"+(edited?" edited":"")} value={catOf(t)} onChange={e=>setCat(t.id,e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select>
-              {bk && <span className="bk" onClick={()=>toggleVac(t.id)} style={{background:BK[bk].c+"1c",color:BK[bk].c,borderColor:BK[bk].c+"55"}}>{BK[bk].l}</span>}
-            </div>
-          </div>)})}
+
+      <div className="sec"><span>Registro de cambios</span><span className="r">en este equipo</span></div>
+      <div className="list">
+        {log.length===0&&<div className="row"><span className="sub" style={{fontSize:13,color:"var(--muted)"}}>Aún no hay cambios hechos desde la app.</span></div>}
+        {log.slice(0,30).map((e,i)=>(<div key={i} className="row" style={{minHeight:52}}><div className="mid"><span className="nm" style={{fontSize:14,whiteSpace:"normal"}}>{e.desc}</span></div>
+          <span style={{fontSize:12,color:"var(--muted)",whiteSpace:"nowrap"}}>{fdate(e.ts.slice(0,10))} {new Date(e.ts).toTimeString().slice(0,5)}</span></div>))}
       </div>
-      ) : (
-      <div style={{overflow:"auto",maxHeight:500}}>
-      <table><thead><tr><th>Fecha</th><th>Cuenta</th><th>Comercio</th><th>Categoría</th><th>Tipo</th><th className="rt">Monto</th></tr></thead>
-        <tbody>
-        {rows.map(t=>{const edited=ovr[t.id]&&ovr[t.id]!==t.cat;const bk=t.excl?null:bucketOf(t);return(
-          <tr key={t.id} className={t.excl?"excl":(bk==="vac"?"vac":"")}>
-            <td className="num">{fdate(t.fecha)}</td>
-            <td><span className="tag" style={{background:ACC[t.cuenta].c+"18",color:ACC[t.cuenta].c}}>{ACC[t.cuenta].s}</span></td>
-            <td>{t.comercio}{t.ciudad&&<span className="chip"> · {t.ciudad}</span>}{t.cuota&&<span className="chip"> · cuota {t.cuota.n}/{t.cuota.de}</span>}</td>
-            <td><select className={"cat"+(edited?" edited":"")} value={catOf(t)} onChange={e=>setCat(t.id,e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select></td>
-            <td>{bk && <span className="bk" onClick={()=>toggleVac(t.id)} style={{background:BK[bk].c+"1c",color:BK[bk].c,borderColor:BK[bk].c+"55"}}>{BK[bk].l}</span>}</td>
-            <td className="rt num" style={{color:t.flow==="in"?"var(--save)":(t.excl?"#AEB3C0":"var(--ink)")}}>{t.flow==="in"?"+":"−"}{clp(t.monto)}{t.moneda==="USD-bill"&&<div className="chip num">{usd(t.monto_orig)}</div>}</td>
-          </tr>)})}
-        </tbody></table>
-      </div>
-      )}
-    </div>
     </>}
-
-    {tab==="fijos" && <>
-    <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",margin:"12px 0 0"}}>
-      <span className="chip">Ciclo {cycleLabel(ciclo)}{ciclo===CICLO_HOY?" · en curso":""} · lista: {fuenteFijos}</span>
-    </div>
-    <div className="cuoSum" style={{marginTop:10}}>
-      <div><div className="k">Esperado del mes</div><div className="num" style={{fontSize:19,fontWeight:700}}>{clp(totEsp)}</div></div>
-      <div><div className="k">Pagado</div><div className="num" style={{fontSize:19,fontWeight:700,color:"var(--save)"}}>{clp(totPag)}</div></div>
-      <div><div className="k">Pendiente</div><div className="num" style={{fontSize:19,fontWeight:700,color:totPend>0?"#E08A3C":"var(--muted)"}}>{clp(totPend)}</div></div>
-      {["STG-TC","STG-CC","CHL-TC","CHL-TC-INT","CHL-CC"].filter(k=>espByAcc[k]).map(k=>(
-        <div key={k}><div className="k" style={{color:ACC[k].c}}>{({"STG-TC":"Santander TC","STG-CC":"Santander CC","CHL-TC":"BdC TC","CHL-TC-INT":"BdC TC Int.","CHL-CC":"BdC CC"})[k]}</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:3}}>{clp(espByAcc[k])}</div></div>))}
-      {espByAcc["—"]>0&&<div><div className="k">Sin cuenta asignada</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:3,color:"var(--muted)"}}>{clp(espByAcc["—"])}</div></div>}
-    </div>
-    {Object.entries(fijosView.reduce((o,f)=>{(o[f.categoria||"Otros"]=o[f.categoria||"Otros"]||[]).push(f);return o;},{}))
-      .sort((a,b)=>b[1].reduce((x,f)=>x+f.monto,0)-a[1].reduce((x,f)=>x+f.monto,0)).map(([cat,lista])=>(
-    <div key={cat} className="panel" style={{marginTop:12,padding:"4px 14px"}}>
-      <div className="fijocat"><span>{cat} <span className="chip">({lista.length})</span></span>
-        <span className="num">{clp(lista.reduce((x,f)=>x+f.monto,0))}{lista.some(f=>!f.pagado)&&<span className="chip"> · pend. {clp(lista.filter(f=>!f.pagado).reduce((x,f)=>x+f.monto,0))}</span>}</span></div>
-      {lista.map(f=>(
-      <div key={f.nombre} className="fijorow">
-        <input type="checkbox" checked={f.pagado} disabled={!!f.tx} onChange={()=>toggleFijo(f.nombre)}/>
-        <div className="fi">
-          <div className="nm">{f.nombre} {f.cuenta&&ACC[f.cuenta]&&<span className="tag" style={{background:ACC[f.cuenta].c+"18",color:ACC[f.cuenta].c}}>{ACC[f.cuenta].s}</span>} <span className="chip">día {f.dia}</span></div>
-          <div className="chip">{f.tx?("pagado el "+fdate(f.tx.fecha)+" — "+f.tx.comercio):(f.manual?"marcado manualmente":(f.atrasado?"⚠ atrasado — se esperaba el "+fdate(f.fEsp):"esperado el "+fdate(f.fEsp)))}</div>
-        </div>
-        <div className="rt">
-          <div className="num" style={{fontWeight:700,color:f.pagado?"var(--save)":(f.atrasado?"#E08A3C":"var(--ink)")}}>{clp(f.montoReal)}</div>
-          {f.tx&&f.tx.monto!==f.monto&&<div className="chip num">esperado {clp(f.monto)}</div>}
-        </div>
-      </div>))}
-    </div>))}
-    <div className="chip" style={{marginTop:10,lineHeight:1.6}}>
-      El ✓ es automático al detectar el cargo del ciclo (por patrón de comercio); usa el checkbox para pagos hechos por fuera.
-      La lista maestra se edita en tu Google Sheet (columnas: nombre, categoria, monto, dia, patron, activo, cuenta).
-      La columna "cuenta" acepta STG-TC, STG-CC, CHL-TC, CHL-CC (o "Santander"/"BC"); si falta, se hereda de la lista embebida por nombre.
-    </div>
-    </>}
-
-    {tab==="cuotas" && <>
-    <div className="cuoSum" style={{marginTop:14}}>
-      <div><div className="k">Cuotas de este ciclo</div><div className="num" style={{fontSize:19,fontWeight:700,color:COL.cuota}}>{clp(cuotasView.carga)}</div>
-        {cuotasView.cargaEsp>0&&<span className="sinesp">(sin {ESP_LBL}: {clp(cuotasView.carga-cuotasView.cargaEsp)})</span>}</div>
-      <div><div className="k">Cupo usado en cuotas</div><div className="num" style={{fontSize:15,fontWeight:600,color:"var(--muted)",marginTop:3}}>{clp(cuotasView.totPend)}</div>
-        <span className="chip">saldo de las compras en cuotas, este ciclo incluido</span></div>
-      <div><div className="k">Todo pagado en</div><div className="num" style={{fontSize:15,fontWeight:600,marginTop:4}}>{cuotasView.fin?mesNom(cuotasView.fin):"—"}</div></div>
-    </div>
-    <div className="panel" style={{marginTop:12,padding:"6px 14px"}}>
-      {cuotasView.items.map(t=>(
-      <div key={t.id} className="fijorow">
-        <div className="fi">
-          <div className="nm">{t.comercio} <span className="chip">cuota {t.nAct}/{t.cuota.de}{t.estimado?" (est.)":""}</span>{t.esp&&<span className="espbadge">★ aparte</span>}</div>
-          <div className="bar" style={{margin:"6px 0 4px"}}><i style={{width:(t.nAct/t.cuota.de*100)+"%",background:!t.activa?"#C7CCD8":t.esp?COL.esp:COL.cuota}}/></div>
-          <div className="chip num">{clp(t.cuota.valor)}/mes · total {clp(t.cuota.total)}</div>
-        </div>
-        <div className="rt">
-          {t.activa ? <>
-            <div className="num" style={{fontWeight:700,color:COL.cuota}}>{clp(t.pend)}</div>
-            <div className="chip">última: <b>{mesNom(t.ultimo)}</b></div>
-          </> : <div className="chip" style={{color:"var(--save)",fontWeight:700}}>✓ pagada</div>}
-        </div>
-      </div>))}
-    </div>
-    <div className="panel" style={{marginTop:12,padding:"14px 16px"}}>
-      <div className="sectitle">Proyección de carga por ciclo {cuotasView.items.some(t=>t.esp&&t.activa)&&<span className="chip"><span className="dot" style={{background:COL.esp,display:"inline-block",marginRight:4}}/>{ESP_LBL} (aparte)</span>}</div>
-      <div style={{display:"flex",flexDirection:"column",gap:7,marginTop:10}}>
-        {cuotasView.proy.map(p=>(<div key={p.c} style={{display:"flex",alignItems:"center",gap:10}}>
-          <span className="chip" style={{width:70,flex:"none"}}>{mesNom(p.c)}</span>
-          <div className="bar" style={{flex:1,display:"flex"}}><i style={{width:((p.monto-p.espM)/Math.max(maxProy,1)*100)+"%",background:COL.cuota}}/><i style={{width:(p.espM/Math.max(maxProy,1)*100)+"%",background:COL.esp}}/></div>
-          <span className="num" style={{fontSize:12,width:150,textAlign:"right",flex:"none"}}>{clp(p.monto)}{p.espM>0&&<span className="chip"> (sin {ESP_LBL} {clp(p.monto-p.espM)})</span>}</span></div>))}
-      </div>
-      {cuotasView.items.some(t=>t.estimado)&&<div className="chip" style={{marginTop:10}}>(est.): cuota avanzada automáticamente desde el último estado de cuenta conciliado; se confirma al conciliar los estados pendientes.</div>}
-    </div>
-    </>}
-
-    {tab==="meses" && <>
-    <div className="grid2" style={{marginTop:14}}>
-      <div className="panel" style={{padding:"16px 18px"}}>
-        <div className="sectitle">A pagar en tarjetas por mes</div>
-        <div style={{width:"100%",height:240,marginTop:10}}>
-          <ResponsiveContainer><BarChart data={chartMeses} margin={{top:6,right:8,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F7" vertical={false}/>
-            <XAxis dataKey="mes" tick={{fontSize:12,fill:"#8A90A0"}} axisLine={false} tickLine={false}/>
-            <YAxis tickFormatter={clpK} tick={{fontSize:11,fill:"#8A90A0"}} axisLine={false} tickLine={false} width={46}/>
-            <Tooltip formatter={v=>clp(v)} labelStyle={{fontWeight:700}}/>
-            <Legend wrapperStyle={{fontSize:12}}/>
-            <Bar dataKey="Banco de Chile" stackId="a" fill="#3460E0"/>
-            <Bar dataKey="Santander" stackId="a" fill="#EC1C3D" radius={[4,4,0,0]}/>
-          </BarChart></ResponsiveContainer>
-        </div>
-      </div>
-      <div className="panel" style={{padding:"16px 18px"}}>
-        <div className="sectitle">Ahorro por mes</div>
-        <div style={{width:"100%",height:240,marginTop:10}}>
-          <ResponsiveContainer><BarChart data={chartAhorro} margin={{top:6,right:8,left:0,bottom:0}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#EEF1F7" vertical={false}/>
-            <XAxis dataKey="mes" tick={{fontSize:12,fill:"#8A90A0"}} axisLine={false} tickLine={false}/>
-            <YAxis tickFormatter={clpK} tick={{fontSize:11,fill:"#8A90A0"}} axisLine={false} tickLine={false} width={46}/>
-            <Tooltip formatter={v=>clp(v)} labelStyle={{fontWeight:700}}/>
-            <Legend wrapperStyle={{fontSize:12}}/>
-            <Bar dataKey="Ahorro" stackId="a" fill="#27B07A"/>
-            <Bar dataKey="Extra MetLife" stackId="a" fill="#9BC85A" radius={[4,4,0,0]}/>
-          </BarChart></ResponsiveContainer>
-        </div>
-        <div className="chip">Acumulado ene–may: ahorro explícito <b className="num">{clp(totAhorro)}</b> + extra MetLife <b className="num">{clp(totAhorroX)}</b>.</div>
-      </div>
-    </div>
-
-    <div className="panel" style={{marginTop:13,padding:"14px 16px 6px",overflow:"auto"}}>
-      <div className="sectitle" style={{marginBottom:6}}>Balances principales por mes</div>
-      <table className="mtab"><thead><tr>
-        <th>Mes 2026</th><th className="rt">TC BdC</th><th className="rt">TC Santander</th><th className="rt">Total tarjetas</th>
-        <th className="rt">Saldo Stg CC</th><th className="rt">Saldo BdC CC</th>
-        <th className="rt">Ahorro</th><th className="rt">Extra MetLife</th>
-      </tr></thead><tbody>
-        {MESES.map(x=>(<tr key={x.mes}>
-          <td style={{fontWeight:600}}>{x.mes}</td>
-          <td className="n">{clp(x.bdcTC)}{x.intl&&<span className="chip num"> +{usd(x.intl)}</span>}</td>
-          <td className="n">{clp(x.stgTC)}</td>
-          <td className="n" style={{fontWeight:700}}>{clp(x.bdcTC+x.stgTC)}</td>
-          <td className="n">{x.sStg!=null?clp(x.sStg):"—"}</td>
-          <td className="n">{clp(x.sChl)}</td>
-          <td className="n" style={{color:x.ahorro?COL.save:"inherit",fontWeight:x.ahorro?600:400}}>{x.ahorro?clp(x.ahorro):"—"}</td>
-          <td className="n" style={{color:"#5E8A2E"}}>{clp(x.ahorroX)}</td>
-        </tr>))}
-      </tbody></table>
-    </div>
-    <div className="chip" style={{marginTop:12,lineHeight:1.6}}>
-      Series desde los estados facturados (TC) y las cartolas (cuentas corrientes) de cada mes, conciliadas con sus totales de control.
-      "Ahorro" son traspasos explícitos a cuenta de ahorro / fondo mutuo; "Extra MetLife" es el 50% del seguro que también acumula.
-      Mayo es atípico por el viaje (financiado con ahorro). El saldo de BdC (~$22M) es el fondo a invertir y no se toca.
-    </div>
-    </>}
-
    </div>
+
+   {selTx&&<div className="scrim" onClick={()=>setSel(null)}>
+    <div className="sheet" role="dialog" aria-modal="true" aria-label={"Movimiento "+selTx.comercio} onClick={e=>e.stopPropagation()}>
+      <div className="grab"/>
+      <div style={{display:"flex",flexDirection:"column",gap:4}}>
+        <span style={{fontSize:13,color:"var(--muted)"}}>{diaLbl(selTx.fecha)} · {ACC[selTx.cuenta]?ACC[selTx.cuenta].s:selTx.cuenta}{selTx.ciudad?" · "+selTx.ciudad:""}</span>
+        <span style={{fontSize:20,fontWeight:800}}>{selTx.comercio}</span>
+        <span style={{fontSize:30,fontWeight:800,letterSpacing:"-.02em"}}>{clp(selTx.monto)}{selTx.moneda==="USD-bill"&&<span style={{fontSize:14,color:"var(--muted)",fontWeight:600}}> · {usd(selTx.monto_orig)}</span>}</span>
+        {selTx.cuota&&<span className={"tag "+(esEsp(selTx)?"t-exc":"t-cuo")} style={{alignSelf:"flex-start"}}>Cuota {selTx.cuota.n}/{selTx.cuota.de} de {clp(selTx.cuota.valor)}</span>}
+      </div>
+      <label style={{display:"flex",flexDirection:"column",gap:6,fontSize:13,color:"var(--muted2)",fontWeight:700}}>Categoría
+        <select className="inp" value={catOf(selTx)} onChange={e=>setCat(selTx.id,e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select></label>
+      {selTx.flow==="out"&&!selTx.excl&&<button className={"btn"+(bucketOf(selTx)==="vac"?" sec2":"")} onClick={()=>toggleVac(selTx.id)}>{bucketOf(selTx)==="vac"?"Quitar de viajes":"Marcar como viaje (va aparte)"}</button>}
+      <button className="btn ghost" onClick={()=>setSel(null)}>Cerrar</button>
+    </div>
+   </div>}
+
+   <nav className="tabbar" aria-label="Secciones"><div className="in">
+    {[["wallet","Wallet",Ico.wallet],["cuotas","Cuotas",Ico.cuotas],["fijos","Fijos",Ico.fijos],["mas","Más",Ico.mas]].map(([k,l,ic])=>
+      <button key={k} className={tab===k?"on":""} aria-current={tab===k?"page":undefined} onClick={()=>{setTab(k); window.scrollTo(0,0);}}>{ic}{l}</button>)}
+   </div></nav>
   </div>);
 }
 
