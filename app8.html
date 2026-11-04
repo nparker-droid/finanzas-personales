@@ -113,7 +113,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-11-04 v20.1";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-11-04 v21";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -255,6 +255,10 @@ const CSS = `
 .dots i{display:block;width:6px;height:6px;border-radius:3px;background:#9AA6C0;}
 .dots i.on{width:18px;background:var(--navy);}
 .dots span{font-size:12px;color:var(--muted);margin-left:6px;}
+.mesbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:-6px;}
+.mesbar .ibtn{font-size:24px;line-height:1;}
+.mesbar .ibtn:disabled{opacity:.35;cursor:default;}
+.wc.cur{cursor:pointer;transition:opacity .2s;align-items:flex-start;}
 .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
 .tile{background:#fff;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:6px;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer;}
 .tile .dot{width:10px;height:10px;border-radius:5px;}
@@ -323,6 +327,14 @@ const diaLbl=f=>{ if(f===HOY) return "Hoy"; if(f===AYER) return "Ayer"; const [y
 const FECHA_HOY=(()=>{const d=new Date(); const s=d.toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"}).replace(",",""); return s.charAt(0).toUpperCase()+s.slice(1);})();
 // v20.1: el balance cuenta solo cobros de tarjeta (igual que el mensaje de WhatsApp); la cuenta corriente va aparte
 const esTC=t=>/TC/.test((t&&t.cuenta)||"");
+// v21: el carrusel del inicio cambia de tarjeta (estilo app de banco); el ciclo se elige arriba
+const TARJ=[
+ {k:"todas",nombre:"Todas las tarjetas",corto:"Todas",sub:"Balance del ciclo",ok:a=>/TC/.test(a),bg:"#14213D",mu:"#B9C2D6"},
+ {k:"CHL",nombre:"Banco de Chile",corto:"BdC",sub:"Tarjeta de crédito",num:"•• 9299",ok:a=>a==="CHL-TC"||a==="CHL-TC-INT",bg:"#0B3A8C",mu:"#C7D6F5"},
+ {k:"STG",nombre:"Santander",corto:"Santander",sub:"Tarjeta de crédito",ok:a=>a==="STG-TC",bg:"#9E1420",mu:"#F5D0D3"},
+ {k:"CC",nombre:"Cuentas corrientes",corto:"Cuentas",sub:"Fuera del balance · CAE, PAC y transferencias",ok:a=>/CC/.test(a),bg:"#3F4554",mu:"#D5D9E2"},
+];
+const tarj=k=>TARJ.find(x=>x.k===k)||TARJ[0];
 const kfmt=n=>"$"+Math.round(n/1000)+"k";
 const QPAL=["#1F4FBF","#7FB0FF","#14213D","#4C7BE0","#BFD0F7","#2E5FA8","#9AB4E8","#5B6170"];
 const FPAL=["#14213D","#1F4FBF","#7FB0FF","#C3CBDB","#4C7BE0","#9AA6C0","#2E5FA8"];
@@ -339,6 +351,7 @@ const Ico={
 
 function App(){
   const [tab,setTab]=useState("wallet");
+  const [card,setCard]=useState("todas");
   const [ovr,setOvr]=useState({});
   const [vac,setVac]=useState(null);
   const [ready,setReady]=useState(false);
@@ -495,18 +508,19 @@ function App(){
     if(cycleTx(t)!==ciclo) return false;
     if(fTipo!=="todo"&&(t.flow!=="out"||t.excl||bucketOf(t)!==fTipo)) return false;
     if(!showExcl&&t.excl) return false;
+    if(!tarj(card).ok(t.cuenta||"")) return false;
     if(fAcc!=="todas"&&t.cuenta!==fAcc) return false;
     if(fCat!=="todas"&&catOf(t)!==fCat) return false;
     if(q&&!(t.comercio.toLowerCase().includes(q.toLowerCase())||(t.ciudad||"").toLowerCase().includes(q.toLowerCase()))) return false;
     return true;
-  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0,fTipo,fijos,vac]);
+  }).sort((a,b)=>a.fecha<b.fecha?1:-1),[ovr,fAcc,fCat,q,showExcl,ciclo,rows0,fTipo,fijos,vac,card]);
 
   // tripwire de duplicados: misma fecha+cuenta+monto+flow con id distinto
   const dupCands=useMemo(()=>{const seen={};let n=0;rows0.forEach(t=>{const k=t.fecha+"|"+t.cuenta+"|"+t.monto+"|"+t.flow;if(seen[k])n++;else seen[k]=1;});return n;},[rows0]);
 
   const ciclosL=useMemo(()=>[...new Set(rows0.map(t=>cycleTx(t)))].sort().reverse(),[rows0]);
   useEffect(()=>{ if(ciclosL.length&&!ciclosL.includes(ciclo)) setCiclo(ciclosL.includes(CICLO_HOY)?CICLO_HOY:ciclosL[0]); },[ciclosL]);
-  useEffect(()=>{ setNVer(12); },[ciclo,fTipo,q,fAcc,fCat]);
+  useEffect(()=>{ setNVer(12); },[ciclo,fTipo,q,fAcc,fCat,card]);
 
   const toggleFijo=(nombre)=>{ const key=ciclo+"|"+nombre;
     const nv=!fijoChk[key]; setFijoChk(p=>({...p,[key]:nv})); store.set("fijo:"+key,nv?"1":"0"); pushCambio([{tipo:"fijo",id:key,valor:nv}]); logCambio("Fijo "+nombre+(nv?" marcado pagado":" desmarcado")+" ("+mesNom(ciclo)+")"); };
@@ -555,7 +569,7 @@ function App(){
 
   // carrusel: centra la tarjeta del ciclo elegido
   useEffect(()=>{ const el=carRef.current, cur=curRef.current; if(!el||!cur) return;
-    el.scrollLeft=cur.offsetLeft-(el.clientWidth-cur.clientWidth)/2; },[ciclo,tab,ready,m&&1]);
+    el.scrollTo({left:cur.offsetLeft-(el.clientWidth-cur.clientWidth)/2,behavior:"smooth"}); },[card,tab,ready,m&&1]);
 
   if(!ready||!m) return <div className="wrap" style={{padding:24}}><style>{CSS}</style>Cargando…</div>;
   const restante=meta-m.consN;
@@ -595,19 +609,35 @@ function App(){
   const otecIt=cuotasView.items.find(t=>t.esp&&t.activa&&!t.futura);
   const otec=esHoy&&otecIt?{n:otecIt.nAct,de:otecIt.cuota.de}:(otecTx?{n:otecTx.cuota.n,de:otecTx.cuota.de}:null);
 
-  // carrusel de ciclos
-  const prevC=cycleAdd(ciclo,-1), nextC=cycleAdd(ciclo,1);
-  const cards=[];
-  if(ciclosL.includes(prevC)) cards.push({k:"prev",c:prevC});
-  cards.push({k:"cur",c:ciclo});
-  if(ciclo<CICLO_HOY&&ciclosL.includes(nextC)) cards.push({k:"next",c:nextC});
-  else if(esHoy&&cuotasView.proy[1]) cards.push({k:"proj",c:nextC});
-  const curIdx=cards.findIndex(x=>x.k==="cur");
+  // montos por tarjeta (misma lógica del balance, filtrada por cuenta)
+  const calcCard=T=>{
+    const inC=t=>cycleTx(t)===ciclo, okT=t=>T.ok(t.cuenta||"");
+    const outC=rows0.filter(t=>t.flow==="out"&&!t.excl&&inC(t)&&okT(t));
+    const sumB=b=>outC.filter(t=>bucketOf(t)===b).reduce((a,t)=>a+t.monto,0);
+    const reemb=rows0.filter(t=>inC(t)&&okT(t)&&catOf(t)==="Reembolso recibido");
+    const reembVac=reemb.filter(t=>REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
+    const cons=sumB("cons")-(reemb.reduce((a,t)=>a+t.monto,0)-reembVac), vac=sumB("vac")-reembVac, fijoAct=sumB("fijo");
+    const fAcc=f=>f.cuenta||"CHL-TC";
+    const fl=fijosView.filter(f=>T.ok(fAcc(f)));
+    const fijo=esHoy?fl.reduce((a,f)=>a+f.monto,0)+Math.max(0,fijoAct-fl.reduce((a,f)=>a+(f.tx&&okT(f.tx)?f.montoReal:0),0)):fijoAct;
+    const act=pj&&pj.act?pj.act.filter(okT):null;
+    const cuota=act?act.reduce((a,t)=>a+t.cuota.valor,0):sumB("cuota");
+    const cuotaEsp=act?act.filter(t=>t.esp).reduce((a,t)=>a+t.cuota.valor,0):outC.filter(t=>bucketOf(t)==="cuota"&&esEsp(t)).reduce((a,t)=>a+t.monto,0);
+    const bal=cons+fijo+cuota+vac, exc=cuotaEsp+vac;
+    const viajes=[...new Set(outC.filter(t=>bucketOf(t)==="vac"&&t.viaje).map(t=>t.viaje))];
+    const ingresos=rows0.filter(t=>t.flow==="in"&&!t.excl&&inC(t)&&okT(t)).reduce((a,t)=>a+t.monto,0);
+    return {cons,fijo,fijoAct,cuota,cuotaEsp,vac,bal,exc,sinExc:bal-exc,viajes,ingresos};
+  };
+  const cardVals=TARJ.map(T=>({T,v:calcCard(T)}));
+  const curCard=cardVals.find(x=>x.T.k===card)||cardVals[0];
+  const cv=curCard.v, esTodas=card==="todas";
+  const curIdx=cardVals.indexOf(curCard);
   const onCarScroll=()=>{ clearTimeout(carT.current); carT.current=setTimeout(()=>{
     const el=carRef.current; if(!el) return; const mid=el.scrollLeft+el.clientWidth/2;
     let best=-1,bd=1e9; [...el.children].forEach((ch,i)=>{const d=Math.abs(ch.offsetLeft+ch.clientWidth/2-mid); if(d<bd){bd=d;best=i;}});
-    const x=cards[best]; if(x&&(x.k==="prev"||x.k==="next")) setCiclo(x.c);
-  },160); };
+    const x=cardVals[best]; if(x&&x.T.k!==card) setCard(x.T.k);
+  },140); };
+  const prevC=cycleAdd(ciclo,-1), nextC=cycleAdd(ciclo,1);
 
   // movimientos agrupados por día
   const vis=rows.slice(0,nVer);
@@ -645,61 +675,54 @@ function App(){
       <button className={"ibtn"+(buscar?" on":"")} aria-label="Buscar movimiento" aria-pressed={buscar} onClick={()=>{setBuscar(!buscar); if(!buscar) setTimeout(()=>listRef.current&&listRef.current.scrollIntoView({behavior:"smooth",block:"start"}),50);}}>{Ico.buscar}</button>
     </div>
 
+    <div className="mesbar">
+      <button className="ibtn" aria-label="Ciclo anterior" disabled={!ciclosL.includes(prevC)} onClick={()=>setCiclo(prevC)}>‹</button>
+      <div style={{textAlign:"center"}}><div style={{fontSize:16,fontWeight:800}}>{mesLargo(ciclo)}</div>
+        <div style={{fontSize:12,color:"var(--muted)"}}>{esHoy?"En curso · faltan "+faltan+" días":(info&&info.bdc?"Facturado":"Cerrado")}</div></div>
+      <button className="ibtn" aria-label="Ciclo siguiente" disabled={ciclo>=CICLO_HOY} onClick={()=>setCiclo(nextC)}>›</button>
+    </div>
+
     <div className="car" ref={carRef} onScroll={onCarScroll}>
-      {cards.map(x=>{
-        if(x.k==="cur") return (
-        <div key={x.k} ref={curRef} className="wc cur">
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8}}>
-            <span className="k">{mesLargo(x.c)} · {esHoy?"en curso":"cerrado"}</span>
-            {esHoy&&<span className="tag" style={{background:"#FF9F5A",color:"#14213D"}}>Faltan {faltan} días</span>}
+      {cardVals.map(({T,v})=>{ const base=Math.max(1,v.cons+v.cuota+v.fijo+v.vac); const sel=T.k===card; return (
+        <button key={T.k} ref={sel?curRef:null} className="wc cur" style={{background:T.bg,opacity:sel?1:.72}} aria-pressed={sel} aria-label={T.nombre+" "+clp(v.bal)} onClick={()=>setCard(T.k)}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,width:"100%"}}>
+            <span className="k" style={{color:T.mu}}>{T.nombre}</span>
+            {T.num&&<span style={{fontSize:12,color:T.mu}}>{T.num}</span>}
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:2}}>
-            <span className="big">{clp(balance)}</span>
-            {excTot>0&&<span className="s">(sin excepcionales {clp(sinExc)})</span>}
+            <span className="big">{clp(v.bal)}</span>
+            <span className="s" style={{color:T.mu}}>{v.exc>0?"(sin excepcionales "+clp(v.sinExc)+")":T.sub}</span>
           </div>
-          <div className="seg3" role="img" aria-label={"Directas "+clp(m.consN)+", cuotas "+clp(cuotaProj)+", fijos "+clp(fijoProj)}>
-            <i style={{width:(m.consN/segBase*100)+"%",background:"#FF9F5A"}}/><i style={{width:(cuotaProj/segBase*100)+"%",background:"#7FB0FF"}}/><i style={{width:(fijoProj/segBase*100)+"%",background:"#E8EDF7"}}/>
+          <div className="seg3" style={{width:"100%"}} role="img" aria-label={"Directas "+clp(v.cons)+", cuotas "+clp(v.cuota)+", fijos "+clp(v.fijo)+(v.vac?", viajes "+clp(v.vac):"")}>
+            <i style={{width:(v.cons/base*100)+"%",background:"#FF9F5A"}}/><i style={{width:(v.cuota/base*100)+"%",background:"#7FB0FF"}}/><i style={{width:(v.fijo/base*100)+"%",background:"#E8EDF7"}}/>{v.vac>0&&<i style={{width:(v.vac/base*100)+"%",background:"#F2B544"}}/>}
           </div>
-        </div>);
-        if(x.k==="proj"){ const p=cuotasView.proy[1]; return (
-        <div key={x.k} className="wc proj">
-          <span className="k">{mesLargo(x.c)} · proyectado</span>
-          <span className="big" style={{fontSize:30}}>{clp(p.monto+totEspTC)}</span>
-          <span className="s">Cuotas {clp(p.monto)}{p.espM>0?" (sin "+ESP_LBL+" "+clp(p.monto-p.espM)+")":""} + fijos en tarjeta {clp(totEspTC)}. No incluye compras directas.</span>
-        </div>);}
-        const tt=totCicloTx(x.c); const ci=CICLO_INFO[x.c];
-        return (
-        <button key={x.k} className="wc past" onClick={()=>setCiclo(x.c)} aria-label={"Ver ciclo "+mesLargo(x.c)}>
-          <span className="k">{mesLargo(x.c)} · {x.c===CICLO_HOY?"en curso · a la fecha":(ci&&ci.bdc?"facturado":"cerrado")}</span>
-          <span className="big" style={{fontSize:30}}>{clp(ci&&ci.bdc?ci.bdc.pagar+((ci.stg&&ci.stg.pagar)||0):tt.tot)}</span>
-          <span className="s">{tt.exc>0?"(sin excepcionales "+clp(tt.tot-tt.exc)+")":"Toca para ver el detalle"}</span>
-        </button>);
-      })}
+        </button>);})}
     </div>
-    <div className="dots" aria-hidden="true">{cards.map((x,i)=><i key={i} className={i===curIdx?"on":""}/>)}<span>{cards.map(x=>MESN[Number(x.c.slice(5))-1]).join(" · ")}</span></div>
+    <div className="dots" aria-hidden="true">{cardVals.map((x,i)=><i key={i} className={i===curIdx?"on":""}/>)}<span>{TARJ.map(x=>x.corto).join(" · ")}</span></div>
     {!esHoy&&<button className="btn sec2" onClick={()=>setCiclo(CICLO_HOY)}>Volver al ciclo en curso</button>}
 
     <div className="tiles">
-      <button className="tile" onClick={()=>irA("cons")}><span className="dot" style={{background:"#FF9F5A"}}/><span className="l">Directas</span><span className="v">{clp(m.consN)}</span>
-        <span className="x" style={{color:restante<0?"var(--warn)":"var(--muted)"}}>{restante>=0?"quedan "+kfmt(restante):kfmt(-restante)+" sobre meta"}</span></button>
-      <button className="tile" onClick={()=>setTab("cuotas")}><span className="dot" style={{background:"#7FB0FF"}}/><span className="l">Cuotas del mes</span><span className="v">{clp(cuotaProj)}</span>
-        <span className="x">{cuotaEspProj>0?"sin "+ESP_LBL+" "+kfmt(cuotaProj-cuotaEspProj):"ver escalera"}</span></button>
-      <button className="tile" onClick={()=>setTab("fijos")}><span className="dot" style={{background:"#C3CBDB"}}/><span className="l">Fijos</span><span className="v">{clp(fijoProj)}</span>
-        <span className="x">{esHoy?"pendiente "+kfmt(Math.max(0,fijoProj-m.fijo)):"en tarjeta"}</span></button>
+      <button className="tile" onClick={()=>irA("cons")}><span className="dot" style={{background:"#FF9F5A"}}/><span className="l">Directas</span><span className="v">{clp(cv.cons)}</span>
+        {esTodas?<span className="x" style={{color:restante<0?"var(--warn)":"var(--muted)"}}>{restante>=0?"quedan "+kfmt(restante):kfmt(-restante)+" sobre meta"}</span>:<span className="x">{curCard.T.corto}</span>}</button>
+      <button className="tile" onClick={()=>setTab("cuotas")}><span className="dot" style={{background:"#7FB0FF"}}/><span className="l">Cuotas del mes</span><span className="v">{clp(cv.cuota)}</span>
+        <span className="x">{cv.cuotaEsp>0?"sin "+ESP_LBL+" "+kfmt(cv.cuota-cv.cuotaEsp):"ver escalera"}</span></button>
+      <button className="tile" onClick={()=>setTab("fijos")}><span className="dot" style={{background:"#C3CBDB"}}/><span className="l">Fijos</span><span className="v">{clp(cv.fijo)}</span>
+        <span className="x">{esHoy?"pendiente "+kfmt(Math.max(0,cv.fijo-cv.fijoAct)):"del ciclo"}</span></button>
     </div>
 
-    {excTot>0&&<div className="list" style={{padding:"4px 16px"}}>
-      {cuotaEspProj>0&&<div className="row" style={{minHeight:56}}><span className="tag t-exc">Excepcional</span><span className="nm" style={{flex:1,fontSize:15,fontWeight:600}}>{ESP_LBL}{otec?" · cuota "+otec.n+"/"+otec.de:""}</span><span className="amt">{clp(cuotaEspProj)}</span></div>}
-      {m.vacN>0&&<div className="row tap" style={{minHeight:56}} onClick={()=>irA("vac")}><span className="tag t-exc">Excepcional</span><span className="nm" style={{flex:1,fontSize:15,fontWeight:600}}>{m.viajes.length?"Viaje "+m.viajes.join(", "):"Viajes"}</span><span className="amt">{clp(m.vacN)}</span></div>}
+    {card==="CC"&&cv.ingresos>0&&<div className="strip"><div><div className="k">Abonos recibidos en el ciclo</div><div className="v" style={{color:"var(--save)"}}>+{clp(cv.ingresos)}</div></div><div className="k" style={{textAlign:"right"}}>Solo los que<br/>vienen en cartola</div></div>}
+    {cv.exc>0&&<div className="list" style={{padding:"4px 16px"}}>
+      {cv.cuotaEsp>0&&<div className="row" style={{minHeight:56}}><span className="tag t-exc">Excepcional</span><span className="nm" style={{flex:1,fontSize:15,fontWeight:600}}>{ESP_LBL}{otec?" · cuota "+otec.n+"/"+otec.de:""}</span><span className="amt">{clp(cv.cuotaEsp)}</span></div>}
+      {cv.vac>0&&<div className="row tap" style={{minHeight:56}} onClick={()=>irA("vac")}><span className="tag t-exc">Excepcional</span><span className="nm" style={{flex:1,fontSize:15,fontWeight:600}}>{cv.viajes.length?"Viaje "+cv.viajes.join(", "):"Viajes"}</span><span className="amt">{clp(cv.vac)}</span></div>}
     </div>}
 
-    {esHoy&&<div className="strip">
+    {esHoy&&esTodas&&<div className="strip">
       <div><div className="k">Proyección al cierre · día {dTr} de {dTot}</div><div className="v">{clp(totProj)}</div></div>
       <div style={{textAlign:"right"}}><div className="k">vs sueldo · con CAE{cuotaEspProj>0?" · sin "+ESP_LBL:""}</div><div className="v" style={{color:delta>=0?"var(--save)":"var(--warn)"}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</div></div>
     </div>}
 
     <div ref={listRef} style={{display:"flex",flexDirection:"column",gap:12,scrollMarginTop:16}}>
-      <div className="sec"><span>Movimientos</span><span className="r">{rows.length}</span></div>
+      <div className="sec"><span>Movimientos · {curCard.T.corto}</span><span className="r">{rows.length}</span></div>
       <div className="segc" role="group" aria-label="Filtrar movimientos">
         {[["todo","Todo"],["cons","Directas"],["cuota","Cuotas"],["fijo","Fijos"],["vac","Viajes"]].map(([k,l])=>
           <button key={k} className={fTipo===k?"on":""} aria-pressed={fTipo===k} onClick={()=>setFTipo(k)}>{l}</button>)}
