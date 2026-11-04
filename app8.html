@@ -113,7 +113,7 @@ const DATA_C = DATA.filter(t=>t&&t.id&&t.fecha);  // defensa ante filas malforma
 const CICLOS = [...new Set(DATA_C.map(t=>cycleTx(t)))].sort().reverse();
 const HOY=(()=>{const d=new Date();return d.getFullYear()+"-"+pp(d.getMonth()+1)+"-"+pp(d.getDate());})();
 const CICLO_HOY=cycleOf(HOY);
-const BUILD="2026-11-04 v20";  // actualizar al editar el archivo: sirve para detectar copias en caché
+const BUILD="2026-11-04 v20.1";  // actualizar al editar el archivo: sirve para detectar copias en caché
 // ====== GASTOS FIJOS ESPERADOS ======
 // Lista maestra editable en Google Sheet publicada como CSV (columnas: nombre,categoria,monto,dia,patron,activo).
 // Pegar la URL CSV en FIJOS_CSV_URL; vacía => usa FIJOS_DEF. "patron" = texto a buscar en el comercio.
@@ -321,6 +321,8 @@ const AYER=(()=>{const d=new Date(); d.setDate(d.getDate()-1); return d.getFullY
 const DIAS=["dom","lun","mar","mié","jue","vie","sáb"];
 const diaLbl=f=>{ if(f===HOY) return "Hoy"; if(f===AYER) return "Ayer"; const [y,m,d]=f.split("-").map(Number); return DIAS[new Date(y,m-1,d).getDay()]+" "+d+" "+MESN[m-1]; };
 const FECHA_HOY=(()=>{const d=new Date(); const s=d.toLocaleDateString("es-CL",{weekday:"long",day:"numeric",month:"long"}).replace(",",""); return s.charAt(0).toUpperCase()+s.slice(1);})();
+// v20.1: el balance cuenta solo cobros de tarjeta (igual que el mensaje de WhatsApp); la cuenta corriente va aparte
+const esTC=t=>/TC/.test((t&&t.cuenta)||"");
 const kfmt=n=>"$"+Math.round(n/1000)+"k";
 const QPAL=["#1F4FBF","#7FB0FF","#14213D","#4C7BE0","#BFD0F7","#2E5FA8","#9AB4E8","#5B6170"];
 const FPAL=["#14213D","#1F4FBF","#7FB0FF","#C3CBDB","#4C7BE0","#9AA6C0","#2E5FA8"];
@@ -455,7 +457,9 @@ function App(){
     if(!vac) return null;
     const inC=t=>cycleTx(t)===ciclo;
     const out=rows0.filter(t=>t.flow==="out"&&!t.excl&&inC(t));
-    const sum=b=>out.filter(t=>bucketOf(t)===b).reduce((a,t)=>a+t.monto,0);
+    const outTC=out.filter(esTC);
+    const ccOut=out.filter(t=>!esTC(t)).reduce((a,t)=>a+t.monto,0);
+    const sum=b=>outTC.filter(t=>bucketOf(t)===b).reduce((a,t)=>a+t.monto,0);
     const cons=sum("cons"), fijo=sum("fijo"), cuota=sum("cuota"), vacb=sum("vac");
     const reembVac=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
     const reembCons=rows0.filter(t=>inC(t)&&catOf(t)==="Reembolso recibido"&&!REEMB_VAC_IDS.has(t.id)).reduce((a,t)=>a+t.monto,0);
@@ -475,14 +479,14 @@ function App(){
       if(d>0||(d===0&&t.cuota.n>p.cuota.n)) cuoMap[k]=t;});
     const cuotas=Object.values(cuoMap).sort((a,b)=>b.cuota.pendiente-a.cuota.pendiente);
     const met=rows0.find(t=>inC(t)&&METLIFE_RE.test(t.comercio)); const metX=met?Math.round(met.monto*0.5):0;
-    const cuotaEsp=out.filter(t=>bucketOf(t)==="cuota"&&esEsp(t)).reduce((a,t)=>a+t.monto,0);
-    const viajes=[...new Set(out.filter(t=>bucketOf(t)==="vac"&&t.viaje).map(t=>t.viaje))];
-    return {consN,fijo,cuota,cuotaEsp,vacN,viajes,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,metX};
+    const cuotaEsp=outTC.filter(t=>bucketOf(t)==="cuota"&&esEsp(t)).reduce((a,t)=>a+t.monto,0);
+    const viajes=[...new Set(outTC.filter(t=>bucketOf(t)==="vac"&&t.viaje).map(t=>t.viaje))];
+    return {ccOut,consN,fijo,cuota,cuotaEsp,vacN,viajes,donut,gastSTG:gastBank("STG"),gastCHL:gastBank("CHL"),cuotas,metX};
   },[ovr,vac,ciclo,rows0,fijos]);
 
   // totales de un ciclo cualquiera (para las tarjetas vecinas del carrusel)
   const totCicloTx=c=>{
-    const out=rows0.filter(t=>t.flow==="out"&&!t.excl&&cycleTx(t)===c);
+    const out=rows0.filter(t=>t.flow==="out"&&!t.excl&&cycleTx(t)===c&&esTC(t));
     let tot=0,exc=0; out.forEach(t=>{const b=bucketOf(t); tot+=t.monto; if(b==="vac"||(b==="cuota"&&esEsp(t))) exc+=t.monto;});
     return {tot,exc};
   };
@@ -563,8 +567,11 @@ function App(){
   const totEsp=fijosView.reduce((a,f)=>a+f.monto,0);
   const totPag=fijosView.filter(f=>f.pagado).reduce((a,f)=>a+f.montoReal,0);
   const totPend=fijosView.filter(f=>!f.pagado).reduce((a,f)=>a+f.monto,0);
-  const fijoMatched=fijosView.reduce((a,f)=>a+(f.tx?f.montoReal:0),0);
-  const fijoProj=ciclo===CICLO_HOY?totEsp+Math.max(0,m.fijo-fijoMatched):m.fijo;
+  const fijoEnTC=f=>!f.cuenta||/TC/.test(f.cuenta);
+  const totEspTC=fijosView.filter(fijoEnTC).reduce((a,f)=>a+f.monto,0);
+  const totEspCC=totEsp-totEspTC;
+  const fijoMatched=fijosView.filter(fijoEnTC).reduce((a,f)=>a+(f.tx&&esTC(f.tx)?f.montoReal:0),0);
+  const fijoProj=ciclo===CICLO_HOY?totEspTC+Math.max(0,m.fijo-fijoMatched):m.fijo;
   const dproj=cycleDiff(ciclo,CICLO_HOY);
   const pj=dproj>=0?(cuotasView.proy[dproj]||{monto:0,espM:0}):null;
   const cuotaProj=pj?pj.monto:m.cuota;
@@ -582,7 +589,7 @@ function App(){
   const dTot=Math.round((fin-new Date(ini+"T00:00:00"))/864e5)+1;
   const dTr=Math.max(1,Math.min(dTot,Math.round((hoyD-new Date(ini+"T00:00:00"))/864e5)+1));
   const totProj=Math.round(m.consN*dTot/dTr)+fijoProj+cuotaProj;
-  const delta=sueldo-(totProj-cuotaEspProj);
+  const delta=sueldo-(totProj-cuotaEspProj+totEspCC);  // el sueldo también paga los fijos por cuenta corriente (CAE, PAC)
   const segBase=Math.max(1,m.consN+cuotaProj+fijoProj);
   const otecTx=rows0.find(t=>cycleTx(t)===ciclo&&t.cuota&&esEsp(t));
   const otecIt=cuotasView.items.find(t=>t.esp&&t.activa&&!t.futura);
@@ -657,8 +664,8 @@ function App(){
         if(x.k==="proj"){ const p=cuotasView.proy[1]; return (
         <div key={x.k} className="wc proj">
           <span className="k">{mesLargo(x.c)} · proyectado</span>
-          <span className="big" style={{fontSize:30}}>{clp(p.monto+totEsp)}</span>
-          <span className="s">Cuotas {clp(p.monto)}{p.espM>0?" (sin "+ESP_LBL+" "+clp(p.monto-p.espM)+")":""} + fijos {clp(totEsp)}. No incluye compras directas.</span>
+          <span className="big" style={{fontSize:30}}>{clp(p.monto+totEspTC)}</span>
+          <span className="s">Cuotas {clp(p.monto)}{p.espM>0?" (sin "+ESP_LBL+" "+clp(p.monto-p.espM)+")":""} + fijos en tarjeta {clp(totEspTC)}. No incluye compras directas.</span>
         </div>);}
         const tt=totCicloTx(x.c); const ci=CICLO_INFO[x.c];
         return (
@@ -678,7 +685,7 @@ function App(){
       <button className="tile" onClick={()=>setTab("cuotas")}><span className="dot" style={{background:"#7FB0FF"}}/><span className="l">Cuotas del mes</span><span className="v">{clp(cuotaProj)}</span>
         <span className="x">{cuotaEspProj>0?"sin "+ESP_LBL+" "+kfmt(cuotaProj-cuotaEspProj):"ver escalera"}</span></button>
       <button className="tile" onClick={()=>setTab("fijos")}><span className="dot" style={{background:"#C3CBDB"}}/><span className="l">Fijos</span><span className="v">{clp(fijoProj)}</span>
-        <span className="x">{esHoy?"pendiente "+kfmt(Math.max(0,fijoProj-m.fijo)):"del ciclo"}</span></button>
+        <span className="x">{esHoy?"pendiente "+kfmt(Math.max(0,fijoProj-m.fijo)):"en tarjeta"}</span></button>
     </div>
 
     {excTot>0&&<div className="list" style={{padding:"4px 16px"}}>
@@ -688,7 +695,7 @@ function App(){
 
     {esHoy&&<div className="strip">
       <div><div className="k">Proyección al cierre · día {dTr} de {dTot}</div><div className="v">{clp(totProj)}</div></div>
-      <div style={{textAlign:"right"}}><div className="k">vs sueldo{cuotaEspProj>0?" (sin "+ESP_LBL+")":""}</div><div className="v" style={{color:delta>=0?"var(--save)":"var(--warn)"}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</div></div>
+      <div style={{textAlign:"right"}}><div className="k">vs sueldo · con CAE{cuotaEspProj>0?" · sin "+ESP_LBL:""}</div><div className="v" style={{color:delta>=0?"var(--save)":"var(--warn)"}}>{delta>=0?"+":"−"}{clp(Math.abs(delta))}</div></div>
     </div>}
 
     <div ref={listRef} style={{display:"flex",flexDirection:"column",gap:12,scrollMarginTop:16}}>
@@ -773,6 +780,8 @@ function App(){
         <div className="seg3" style={{height:10}}>{cats.map(x=><i key={x.c} style={{width:(x.tot/T*100)+"%",background:x.color}}/>)}</div>
         <div className="lg">{cats.map(x=><span key={x.c}><span className="sq" style={{background:x.color}}/>{x.c} · {Math.round(x.tot/T*100)} %</span>)}</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,borderTop:"1px solid var(--line)",paddingTop:12}}>
+          <div><div style={{fontSize:12,color:"var(--muted)"}}>En tarjeta · va al balance</div><div style={{fontSize:16,fontWeight:800}}>{clp(totEspTC)}</div></div>
+          <div><div style={{fontSize:12,color:"var(--muted)"}}>Cuenta corriente · aparte</div><div style={{fontSize:16,fontWeight:800}}>{clp(totEspCC)}</div></div>
           <div><div style={{fontSize:12,color:"var(--muted)"}}>Pagado</div><div style={{fontSize:16,fontWeight:800,color:"var(--save)"}}>{clp(totPag)}</div></div>
           <div><div style={{fontSize:12,color:"var(--muted)"}}>Pendiente</div><div style={{fontSize:16,fontWeight:800,color:totPend>0?"var(--warn)":"var(--muted)"}}>{clp(totPend)}</div></div>
         </div>
@@ -782,7 +791,7 @@ function App(){
         <div className="list">{x.l.map(f=>(<div key={f.nombre} className="row">
           <button className={"chk"+(f.pagado?" on":"")} disabled={!!f.tx} aria-pressed={f.pagado} aria-label={(f.pagado?"Pagado: ":"Marcar pagado: ")+f.nombre} onClick={()=>toggleFijo(f.nombre)}>{f.pagado&&Ico.check}</button>
           <div className="mid"><span className="nm">{f.nombre}</span>
-            <span className="sub">{f.tx?"Pagado el "+fdate(f.tx.fecha):(f.manual?"Marcado a mano":(f.atrasado?<span className="tag t-warn">Atrasado · se esperaba el {fdate(f.fEsp)}</span>:"Esperado el "+fdate(f.fEsp)))}{f.cuenta&&ACC[f.cuenta]?" · "+ACC[f.cuenta].s:""}</span></div>
+            <span className="sub">{f.tx?"Pagado el "+fdate(f.tx.fecha):(f.manual?"Marcado a mano":(f.atrasado?<span className="tag t-warn">Atrasado · se esperaba el {fdate(f.fEsp)}</span>:"Esperado el "+fdate(f.fEsp)))}{f.cuenta&&ACC[f.cuenta]?" · "+ACC[f.cuenta].s:""}{!fijoEnTC(f)&&<span className="tag t-fij">Fuera del balance</span>}</span></div>
           <div style={{textAlign:"right"}}><div className="amt" style={{color:f.pagado?"var(--save)":"var(--ink)"}}>{clp(f.montoReal)}</div>
             {f.tx&&f.tx.monto!==f.monto&&<div style={{fontSize:11,color:"var(--muted)"}}>esperado {clp(f.monto)}</div>}</div>
         </div>))}</div>
@@ -831,6 +840,7 @@ function App(){
           <div key={k} className="row"><span className="sq" style={{background:b.color}}/><div className="mid"><span className="nm">{b.label}</span>
             <span className="sub">{bi?"A pagar "+clp(bi.pagar)+(bi.intl?" + "+usd(bi.intl):"")+" · vence "+bi.vence:"Sin estado de cuenta del ciclo"}</span></div>
             <div style={{textAlign:"right"}}><div style={{fontSize:11,color:"var(--muted)"}}>Gastado</div><div className="amt">{clp(gast)}</div></div></div>);})}
+        <div className="row"><div className="mid"><span className="nm">Cuenta corriente</span><span className="sub">CAE, PAC y transferencias · fuera del balance</span></div><span className="amt">{clp(m.ccOut)}</span></div>
         <div className="row"><div className="mid"><span className="nm">Ahorro extra · 50 % MetLife</span><span className="sub">No lo cuentas, pero acumula</span></div><span className="amt">{clp(m.metX)}</span></div>
         <div className="row"><div className="mid"><span className="nm">Fondo a invertir</span><span className="sub">No disponible para gasto</span></div><span className="amt">{clp(RESERVA_CHL)}</span></div>
       </div>
